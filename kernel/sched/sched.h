@@ -606,7 +606,11 @@ DECLARE_PER_CPU(struct sched_domain *, sd_asym);
 
 struct sched_group_capacity {
 	atomic_t ref;
-	unsigned int capacity, capacity_orig;
+	/*
+	 * CPU capacity of this group, SCHED_LOAD_SCALE being max capacity
+	 * for a single CPU.
+	 */
+	unsigned int capacity;
 	unsigned long next_update;
 	int imbalance; 
 	atomic_t nr_busy_cpus;

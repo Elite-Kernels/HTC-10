@@ -4279,12 +4279,6 @@ static int sched_domain_debug_one(struct sched_domain *sd, int cpu, int level,
 			break;
 		}
 
-		if (!group->sgc->capacity_orig) {
-			printk(KERN_CONT "\n");
-			printk(KERN_ERR "ERROR: domain->cpu_capacity not set\n");
-			break;
-		}
-
 		if (!cpumask_weight(sched_group_cpus(group))) {
 			printk(KERN_CONT "\n");
 			printk(KERN_ERR "ERROR: empty group\n");
@@ -4714,7 +4708,6 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 			build_group_mask(sd, sg);
 
 		sg->sgc->capacity = SCHED_CAPACITY_SCALE * cpumask_weight(sg_span);
-		sg->sgc->capacity_orig = sg->sgc->capacity;
 
 		if ((!groups && cpumask_test_cpu(cpu, sg_span)) ||
 		    group_balance_cpu(sg) == cpu)
