@@ -7,6 +7,7 @@
 
 #include <linux/debugfs.h>
 #include <linux/cma.h>
+<<<<<<< HEAD
 #include <linux/list.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -20,6 +21,11 @@ struct cma_mem {
 	unsigned long n;
 };
 
+=======
+
+#include "cma.h"
+
+>>>>>>> f26b730... mm: cma: debugfs interface
 static struct dentry *cma_debugfs_root;
 
 static int cma_debugfs_get(void *data, u64 *val)
@@ -30,6 +36,7 @@ static int cma_debugfs_get(void *data, u64 *val)
 
 	return 0;
 }
+<<<<<<< HEAD
 DEFINE_SIMPLE_ATTRIBUTE(cma_debugfs_fops, cma_debugfs_get, NULL, "%llu\n");
 
 static int cma_used_get(void *data, u64 *val)
@@ -160,6 +167,10 @@ static int cma_alloc_write(void *data, u64 val)
 	return cma_alloc_mem(cma, pages);
 }
 DEFINE_SIMPLE_ATTRIBUTE(cma_alloc_fops, NULL, cma_alloc_write, "%llu\n");
+=======
+
+DEFINE_SIMPLE_ATTRIBUTE(cma_debugfs_fops, cma_debugfs_get, NULL, "%llu\n");
+>>>>>>> f26b730... mm: cma: debugfs interface
 
 static void cma_debugfs_add_one(struct cma *cma, int idx)
 {
@@ -171,20 +182,27 @@ static void cma_debugfs_add_one(struct cma *cma, int idx)
 
 	tmp = debugfs_create_dir(name, cma_debugfs_root);
 
+<<<<<<< HEAD
 	debugfs_create_file("alloc", S_IWUSR, tmp, cma,
 				&cma_alloc_fops);
 
 	debugfs_create_file("free", S_IWUSR, tmp, cma,
 				&cma_free_fops);
 
+=======
+>>>>>>> f26b730... mm: cma: debugfs interface
 	debugfs_create_file("base_pfn", S_IRUGO, tmp,
 				&cma->base_pfn, &cma_debugfs_fops);
 	debugfs_create_file("count", S_IRUGO, tmp,
 				&cma->count, &cma_debugfs_fops);
 	debugfs_create_file("order_per_bit", S_IRUGO, tmp,
+<<<<<<< HEAD
 				&cma->order_per_bit, &cma_debugfs_fops);
 	debugfs_create_file("used", S_IRUGO, tmp, cma, &cma_used_fops);
 	debugfs_create_file("maxchunk", S_IRUGO, tmp, cma, &cma_maxchunk_fops);
+=======
+			&cma->order_per_bit, &cma_debugfs_fops);
+>>>>>>> f26b730... mm: cma: debugfs interface
 
 	u32s = DIV_ROUND_UP(cma_bitmap_maxno(cma), BITS_PER_BYTE * sizeof(u32));
 	debugfs_create_u32_array("bitmap", S_IRUGO, tmp, (u32*)cma->bitmap, u32s);
