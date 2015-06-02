@@ -27,7 +27,7 @@
  * Returns:
  *	x0 - bytes not copied
  */
-ENTRY(__copy_from_user)
+ENTRY(__arch_copy_from_user)
 	add	x5, x1, x2			// upper user buffer boundary
 	subs	x2, x2, #16
 	b.mi	1f
