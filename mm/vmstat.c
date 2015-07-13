@@ -640,6 +640,7 @@ const char * const vmstat_text[] = {
 	
 	"pgpgin",
 	"pgpgout",
+	"pgpgoutclean",
 	"pswpin",
 	"pswpout",
 
