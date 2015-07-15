@@ -1791,8 +1791,8 @@ void wake_up_new_task(struct task_struct *p)
 	set_task_cpu(p, select_task_rq(p, task_cpu(p), SD_BALANCE_FORK, 0));
 #endif
 
-	
-	init_task_runnable_average(p);
+	/* Initialize new task's runnable average */
+	init_entity_runnable_average(&p->se);
 	rq = __task_rq_lock(p);
 	activate_task(rq, p, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
