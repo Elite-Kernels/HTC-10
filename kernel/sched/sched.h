@@ -437,9 +437,7 @@ struct rq {
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	
 	struct list_head leaf_cfs_rq_list;
-
-	struct sched_avg avg;
-#endif 
+#endif /* CONFIG_FAIR_GROUP_SCHED */
 
 	unsigned long nr_uninterruptible;
 
