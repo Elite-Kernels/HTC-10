@@ -285,25 +285,29 @@ struct flex_groups {
 #define EXT4_NODUMP_FL			0x00000040 
 #define EXT4_NOATIME_FL			0x00000080 
 #define EXT4_DIRTY_FL			0x00000100
-#define EXT4_COMPRBLK_FL		0x00000200 
-#define EXT4_NOCOMPR_FL			0x00000400 
-#define EXT4_ECOMPR_FL			0x00000800 
-#define EXT4_INDEX_FL			0x00001000 
-#define EXT4_IMAGIC_FL			0x00002000 
-#define EXT4_JOURNAL_DATA_FL		0x00004000 
-#define EXT4_NOTAIL_FL			0x00008000 
-#define EXT4_DIRSYNC_FL			0x00010000 
-#define EXT4_TOPDIR_FL			0x00020000 
-#define EXT4_HUGE_FILE_FL               0x00040000 
-#define EXT4_EXTENTS_FL			0x00080000 
-#define EXT4_EA_INODE_FL	        0x00200000 
-#define EXT4_EOFBLOCKS_FL		0x00400000 
-#define EXT4_INLINE_DATA_FL		0x10000000 
-#define EXT4_RESERVED_FL		0x80000000 
 
-#define EXT4_FL_USER_VISIBLE		0x004BDFFF 
-#define EXT4_FL_USER_MODIFIABLE		0x004380FF 
+#define EXT4_COMPRBLK_FL		0x00000200 /* One or more compressed clusters */
+#define EXT4_NOCOMPR_FL			0x00000400 /* Don't compress */
+	/* nb: was previously EXT2_ECOMPR_FL */
+#define EXT4_ENCRYPT_FL			0x00000800 /* encrypted file */
+/* End compression flags --- maybe not all used */
+#define EXT4_INDEX_FL			0x00001000 /* hash-indexed directory */
+#define EXT4_IMAGIC_FL			0x00002000 /* AFS directory */
+#define EXT4_JOURNAL_DATA_FL		0x00004000 /* file data should be journaled */
+#define EXT4_NOTAIL_FL			0x00008000 /* file tail should not be merged */
+#define EXT4_DIRSYNC_FL			0x00010000 /* dirsync behaviour (directories only) */
+#define EXT4_TOPDIR_FL			0x00020000 /* Top of directory hierarchies*/
+#define EXT4_HUGE_FILE_FL               0x00040000 /* Set to each huge file */
+#define EXT4_EXTENTS_FL			0x00080000 /* Inode uses extents */
+#define EXT4_EA_INODE_FL	        0x00200000 /* Inode used for large EA */
+#define EXT4_EOFBLOCKS_FL		0x00400000 /* Blocks allocated beyond EOF */
+#define EXT4_INLINE_DATA_FL		0x10000000 /* Inode has inline data. */
+#define EXT4_RESERVED_FL		0x80000000 /* reserved for ext4 lib */
 
+#define EXT4_FL_USER_VISIBLE		0x004BDFFF /* User visible flags */
+#define EXT4_FL_USER_MODIFIABLE		0x004380FF /* User modifiable flags */
+
+/* Flags that should be inherited by new inodes from their parent. */
 #define EXT4_FL_INHERITED (EXT4_SECRM_FL | EXT4_UNRM_FL | EXT4_COMPR_FL |\
 			   EXT4_SYNC_FL | EXT4_NODUMP_FL | EXT4_NOATIME_FL |\
 			   EXT4_NOCOMPR_FL | EXT4_JOURNAL_DATA_FL |\
@@ -324,30 +328,32 @@ static inline __u32 ext4_mask_flags(umode_t mode, __u32 flags)
 }
 
 enum {
-	EXT4_INODE_SECRM	= 0,	
-	EXT4_INODE_UNRM		= 1,	
-	EXT4_INODE_COMPR	= 2,	
-	EXT4_INODE_SYNC		= 3,	
-	EXT4_INODE_IMMUTABLE	= 4,	
-	EXT4_INODE_APPEND	= 5,	
-	EXT4_INODE_NODUMP	= 6,	
-	EXT4_INODE_NOATIME	= 7,	
+	EXT4_INODE_SECRM	= 0,	/* Secure deletion */
+	EXT4_INODE_UNRM		= 1,	/* Undelete */
+	EXT4_INODE_COMPR	= 2,	/* Compress file */
+	EXT4_INODE_SYNC		= 3,	/* Synchronous updates */
+	EXT4_INODE_IMMUTABLE	= 4,	/* Immutable file */
+	EXT4_INODE_APPEND	= 5,	/* writes to file may only append */
+	EXT4_INODE_NODUMP	= 6,	/* do not dump file */
+	EXT4_INODE_NOATIME	= 7,	/* do not update atime */
+/* Reserved for compression usage, co-opted for encryption usage */
 	EXT4_INODE_DIRTY	= 8,
-	EXT4_INODE_COMPRBLK	= 9,	
-	EXT4_INODE_NOCOMPR	= 10,	
-	EXT4_INODE_ECOMPR	= 11,	
-	EXT4_INODE_INDEX	= 12,	
-	EXT4_INODE_IMAGIC	= 13,	
-	EXT4_INODE_JOURNAL_DATA	= 14,	
-	EXT4_INODE_NOTAIL	= 15,	
-	EXT4_INODE_DIRSYNC	= 16,	
-	EXT4_INODE_TOPDIR	= 17,	
-	EXT4_INODE_HUGE_FILE	= 18,	
-	EXT4_INODE_EXTENTS	= 19,	
-	EXT4_INODE_EA_INODE	= 21,	
-	EXT4_INODE_EOFBLOCKS	= 22,	
-	EXT4_INODE_INLINE_DATA	= 28,	
-	EXT4_INODE_RESERVED	= 31,	
+	EXT4_INODE_COMPRBLK	= 9,	/* One or more compressed clusters */
+	EXT4_INODE_NOCOMPR	= 10,	/* Don't compress */
+	EXT4_INODE_ENCRYPT	= 11,	/* Encrypted */
+/* End compression flags --- maybe not all used */
+	EXT4_INODE_INDEX	= 12,	/* hash-indexed directory */
+	EXT4_INODE_IMAGIC	= 13,	/* AFS directory */
+	EXT4_INODE_JOURNAL_DATA	= 14,	/* file data should be journaled */
+	EXT4_INODE_NOTAIL	= 15,	/* file tail should not be merged */
+	EXT4_INODE_DIRSYNC	= 16,	/* dirsync behaviour (directories only) */
+	EXT4_INODE_TOPDIR	= 17,	/* Top of directory hierarchies*/
+	EXT4_INODE_HUGE_FILE	= 18,	/* Set to each huge file */
+	EXT4_INODE_EXTENTS	= 19,	/* Inode uses extents */
+	EXT4_INODE_EA_INODE	= 21,	/* Inode used for large EA */
+	EXT4_INODE_EOFBLOCKS	= 22,	/* Blocks allocated beyond EOF */
+	EXT4_INODE_INLINE_DATA	= 28,	/* Data in inode. */
+	EXT4_INODE_RESERVED	= 31,	/* reserved for ext4 lib */
 };
 
 #define TEST_FLAG_VALUE(FLAG) (EXT4_##FLAG##_FL == (1 << EXT4_INODE_##FLAG))
@@ -366,7 +372,7 @@ static inline void ext4_check_flag_values(void)
 	CHECK_FLAG_VALUE(DIRTY);
 	CHECK_FLAG_VALUE(COMPRBLK);
 	CHECK_FLAG_VALUE(NOCOMPR);
-	CHECK_FLAG_VALUE(ECOMPR);
+	CHECK_FLAG_VALUE(ENCRYPT);
 	CHECK_FLAG_VALUE(INDEX);
 	CHECK_FLAG_VALUE(IMAGIC);
 	CHECK_FLAG_VALUE(JOURNAL_DATA);
@@ -461,6 +467,16 @@ enum {
 #define EXT4_FREE_BLOCKS_NOFREE_FIRST_CLUSTER	0x0010
 #define EXT4_FREE_BLOCKS_NOFREE_LAST_CLUSTER	0x0020
 
+/* Encryption algorithms */
+#define EXT4_ENCRYPTION_MODE_INVALID		0
+#define EXT4_ENCRYPTION_MODE_AES_256_XTS	1
+#define EXT4_ENCRYPTION_MODE_AES_256_GCM	2
+#define EXT4_ENCRYPTION_MODE_AES_256_CBC	3
+#define EXT4_ENCRYPTION_MODE_AES_256_CTS	4
+
+/*
+ * ioctl commands
+ */
 #define	EXT4_IOC_GETFLAGS		FS_IOC_GETFLAGS
 #define	EXT4_IOC_SETFLAGS		FS_IOC_SETFLAGS
 #define	EXT4_IOC_GETVERSION		_IOR('f', 3, long)
@@ -894,25 +910,26 @@ struct ext4_super_block {
 	__le32	s_hash_seed[4];		
 	__u8	s_def_hash_version;	
 	__u8	s_jnl_backup_type;
-	__le16  s_desc_size;		
-	__le32	s_default_mount_opts;
-	__le32	s_first_meta_bg;	
-	__le32	s_mkfs_time;		
-	__le32	s_jnl_blocks[17];	
-	
-	__le32	s_blocks_count_hi;	
-	__le32	s_r_blocks_count_hi;	
-	__le32	s_free_blocks_count_hi;	
-	__le16	s_min_extra_isize;	
-	__le16	s_want_extra_isize; 	
-	__le32	s_flags;		
-	__le16  s_raid_stride;		
-	__le16  s_mmp_update_interval;  
-	__le64  s_mmp_block;            
-	__le32  s_raid_stripe_width;    
-	__u8	s_log_groups_per_flex;  
-	__u8	s_checksum_type;	
-	__le16  s_reserved_pad;
+	__le16  s_desc_size;		/* size of group descriptor */
+/*100*/	__le32	s_default_mount_opts;
+	__le32	s_first_meta_bg;	/* First metablock block group */
+	__le32	s_mkfs_time;		/* When the filesystem was created */
+	__le32	s_jnl_blocks[17];	/* Backup of the journal inode */
+	/* 64bit support valid if EXT4_FEATURE_COMPAT_64BIT */
+/*150*/	__le32	s_blocks_count_hi;	/* Blocks count */
+	__le32	s_r_blocks_count_hi;	/* Reserved blocks count */
+	__le32	s_free_blocks_count_hi;	/* Free blocks count */
+	__le16	s_min_extra_isize;	/* All inodes have at least # bytes */
+	__le16	s_want_extra_isize; 	/* New inodes should reserve # bytes */
+	__le32	s_flags;		/* Miscellaneous flags */
+	__le16  s_raid_stride;		/* RAID stride */
+	__le16  s_mmp_update_interval;  /* # seconds to wait in MMP checking */
+	__le64  s_mmp_block;            /* Block for multi-mount protection */
+	__le32  s_raid_stripe_width;    /* blocks on all data disks (N*stride)*/
+	__u8	s_log_groups_per_flex;  /* FLEX_BG group size */
+	__u8	s_checksum_type;	/* metadata checksum algorithm used */
+	__u8	s_encryption_level;	/* versioning level for encryption */
+	__u8	s_reserved_pad;		/* Padding to next 32bits */
 	__le64	s_kbytes_written;	/* nr of lifetime kilobytes written */
 	__le32	s_snapshot_inum;	
 	__le32	s_snapshot_id;		
@@ -932,12 +949,15 @@ struct ext4_super_block {
 	__u8	s_last_error_func[32];	
 #define EXT4_S_ERR_END offsetof(struct ext4_super_block, s_mount_opts)
 	__u8	s_mount_opts[64];
-	__le32	s_usr_quota_inum;	
-	__le32	s_grp_quota_inum;	
-	__le32	s_overhead_clusters;	
-	__le32	s_backup_bgs[2];	
-	__le32	s_reserved[106];	
-	__le32	s_checksum;		
+	__le32	s_usr_quota_inum;	/* inode for tracking user quota */
+	__le32	s_grp_quota_inum;	/* inode for tracking group quota */
+	__le32	s_overhead_clusters;	/* overhead blocks/clusters in fs */
+	__le32	s_backup_bgs[2];	/* groups with sparse_super2 SBs */
+	__u8	s_encrypt_algos[4];	/* Encryption algorithms in use  */
+	__u8	s_encrypt_pw_salt[16];	/* Salt used for string2key algorithm */
+	__le32	s_lpf_ino;		/* Location of the lost+found inode */
+	__le32	s_reserved[100];	/* Padding to the end of the block */
+	__le32	s_checksum;		/* crc32c(superblock) */
 };
 
 #define EXT4_S_ERR_LEN (EXT4_S_ERR_END - EXT4_S_ERR_START)
@@ -1277,11 +1297,12 @@ static inline void ext4_clear_state_flags(struct ext4_inode_info *ei)
 #define EXT4_FEATURE_INCOMPAT_64BIT		0x0080
 #define EXT4_FEATURE_INCOMPAT_MMP               0x0100
 #define EXT4_FEATURE_INCOMPAT_FLEX_BG		0x0200
-#define EXT4_FEATURE_INCOMPAT_EA_INODE		0x0400 
-#define EXT4_FEATURE_INCOMPAT_DIRDATA		0x1000 
-#define EXT4_FEATURE_INCOMPAT_BG_USE_META_CSUM	0x2000 
-#define EXT4_FEATURE_INCOMPAT_LARGEDIR		0x4000 
-#define EXT4_FEATURE_INCOMPAT_INLINE_DATA	0x8000 
+#define EXT4_FEATURE_INCOMPAT_EA_INODE		0x0400 /* EA in inode */
+#define EXT4_FEATURE_INCOMPAT_DIRDATA		0x1000 /* data in dirent */
+#define EXT4_FEATURE_INCOMPAT_BG_USE_META_CSUM	0x2000 /* use crc32c for bg */
+#define EXT4_FEATURE_INCOMPAT_LARGEDIR		0x4000 /* >2GB or 3-lvl htree */
+#define EXT4_FEATURE_INCOMPAT_INLINE_DATA	0x8000 /* data in inode */
+#define EXT4_FEATURE_INCOMPAT_ENCRYPT		0x10000
 
 #define EXT2_FEATURE_COMPAT_SUPP	EXT4_FEATURE_COMPAT_EXT_ATTR
 #define EXT2_FEATURE_INCOMPAT_SUPP	(EXT4_FEATURE_INCOMPAT_FILETYPE| \
