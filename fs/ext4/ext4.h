@@ -757,6 +757,7 @@ struct ext4_inode_info {
 
 	
 	__u16 i_extra_isize;
+	char i_crypt_policy_flags;
 
 	
 	u16 i_inline_off;
