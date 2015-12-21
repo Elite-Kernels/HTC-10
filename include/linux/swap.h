@@ -116,6 +116,7 @@ enum {
 
 #define SWAP_CLUSTER_MAX 32UL
 #define COMPACT_CLUSTER_MAX SWAP_CLUSTER_MAX
+#define SWAPFILE_CLUSTER	256
 
 #define KSWAPD_ZONE_BALANCE_GAP_RATIO 100
 
@@ -165,10 +166,24 @@ struct swap_info_struct {
 	unsigned long *frontswap_map;	
 	atomic_t frontswap_pages;	
 #endif
-	spinlock_t lock;		
-	struct work_struct discard_work; 
-	struct swap_cluster_info discard_cluster_head; 
-	struct swap_cluster_info discard_cluster_tail; 
+	spinlock_t lock;		/*
+					 * protect map scan related fields like
+					 * swap_map, lowest_bit, highest_bit,
+					 * inuse_pages, cluster_next,
+					 * cluster_nr, lowest_alloc,
+					 * highest_alloc, free/discard cluster
+					 * list. other fields are only changed
+					 * at swapon/swapoff, so are protected
+					 * by swap_lock. changing flags need
+					 * hold this lock and swap_lock. If
+					 * both locks need hold, hold swap_lock
+					 * first.
+					 */
+	struct work_struct discard_work; /* discard worker */
+	struct swap_cluster_info discard_cluster_head; /* list head of discard clusters */
+	struct swap_cluster_info discard_cluster_tail; /* list tail of discard clusters */
+	unsigned int write_pending;
+	unsigned int max_writes;
 };
 
 void *workingset_eviction(struct address_space *mapping, struct page *page);
@@ -247,6 +262,8 @@ extern unsigned long mem_cgroup_shrink_node_zone(struct mem_cgroup *mem,
 						unsigned long *nr_scanned);
 extern unsigned long shrink_all_memory(unsigned long nr_pages);
 extern int vm_swappiness;
+extern int sysctl_swap_ratio;
+extern int sysctl_swap_ratio_enable;
 extern int remove_mapping(struct address_space *mapping, struct page *page);
 extern unsigned long vm_total_pages;
 
