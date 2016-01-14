@@ -315,7 +315,23 @@ static int fold_diff(int *diff)
 	return changes;
 }
 
-static int refresh_cpu_vm_stats(void)
+/*
+ * Update the zone counters for the current cpu.
+ *
+ * Note that refresh_cpu_vm_stats strives to only access
+ * node local memory. The per cpu pagesets on remote zones are placed
+ * in the memory local to the processor using that pageset. So the
+ * loop over all zones will access a series of cachelines local to
+ * the processor.
+ *
+ * The call to zone_page_state_add updates the cachelines with the
+ * statistics in the remote zone struct as well as the global cachelines
+ * with the global counters. These could cause remote node cache line
+ * bouncing and will have to be only done when necessary.
+ *
+ * The function returns the number of global counters updated.
+ */
+static int refresh_cpu_vm_stats(bool do_pagesets)
 {
 	struct zone *zone;
 	int i;
@@ -339,23 +355,35 @@ static int refresh_cpu_vm_stats(void)
 #endif
 			}
 		}
-		cond_resched();
 #ifdef CONFIG_NUMA
-		if (!__this_cpu_read(p->expire) ||
+		if (do_pagesets) {
+			cond_resched();
+			/*
+			 * Deal with draining the remote pageset of this
+			 * processor
+			 *
+			 * Check if there are pages remaining in this pageset
+			 * if not then there is nothing to expire.
+			 */
+			if (!__this_cpu_read(p->expire) ||
 			       !__this_cpu_read(p->pcp.count))
-			continue;
+				continue;
 
-		if (zone_to_nid(zone) == numa_node_id()) {
-			__this_cpu_write(p->expire, 0);
-			continue;
-		}
+			/*
+			 * We never drain zones local to this processor.
+			 */
+			if (zone_to_nid(zone) == numa_node_id()) {
+				__this_cpu_write(p->expire, 0);
+				continue;
+			}
 
-		if (__this_cpu_dec_return(p->expire))
-			continue;
+			if (__this_cpu_dec_return(p->expire))
+				continue;
 
-		if (__this_cpu_read(p->pcp.count)) {
-			drain_zone_pages(zone, this_cpu_ptr(&p->pcp));
-			changes++;
+			if (__this_cpu_read(p->pcp.count)) {
+				drain_zone_pages(zone, this_cpu_ptr(&p->pcp));
+				changes++;
+			}
 		}
 #endif
 	}
@@ -1151,11 +1179,23 @@ static cpumask_var_t cpu_stat_off;
 
 static void vmstat_update(struct work_struct *w)
 {
-	if (refresh_cpu_vm_stats())
+	if (refresh_cpu_vm_stats(true)) {
+		/*
+		 * Counters were updated so we expect more updates
+		 * to occur in the future. Keep on running the
+		 * update worker thread.
+		 */
 		schedule_delayed_work_on(smp_processor_id(),
 				this_cpu_ptr(&vmstat_work),
 			round_jiffies_relative(sysctl_stat_interval));
-	else {
+	} else {
+		/*
+		 * We did not update any counters so the app may be in
+		 * a mode where it does not cause counter updates.
+		 * We may be uselessly running vmstat_update.
+		 * Defer the checking for differentials to the
+		 * shepherd thread on a different processor.
+		 */
 		int r;
 		r = cpumask_test_and_set_cpu(smp_processor_id(),
 			cpu_stat_off);
@@ -1163,6 +1203,27 @@ static void vmstat_update(struct work_struct *w)
 	}
 }
 
+/*
+ * Switch off vmstat processing and then fold all the remaining differentials
+ * until the diffs stay at zero. The function is used by NOHZ and can only be
+ * invoked when tick processing is not active.
+ */
+void quiet_vmstat(void)
+{
+	if (system_state != SYSTEM_RUNNING)
+		return;
+
+	do {
+		if (!cpumask_test_and_set_cpu(smp_processor_id(), cpu_stat_off))
+			cancel_delayed_work(this_cpu_ptr(&vmstat_work));
+
+	} while (refresh_cpu_vm_stats(false));
+}
+
+/*
+ * Check if the diffs for a certain cpu indicate that
+ * an update is needed.
+ */
 static bool need_update(int cpu)
 {
 	struct zone *zone;
@@ -1181,7 +1242,7 @@ static bool need_update(int cpu)
 
 static void vmstat_shepherd(struct work_struct *w);
 
-static DECLARE_DELAYED_WORK(shepherd, vmstat_shepherd);
+static DECLARE_DEFERRABLE_WORK(shepherd, vmstat_shepherd);
 
 static void vmstat_shepherd(struct work_struct *w)
 {
