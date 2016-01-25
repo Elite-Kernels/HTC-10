@@ -554,10 +554,11 @@ void do_exit(long code)
 		schedule();
 	}
 
-	exit_signals(tsk);  
-
-	sched_exit(tsk);
-
+	exit_signals(tsk);  /* sets PF_EXITING */
+	/*
+	 * tsk->flags are checked in the futex code to protect against
+	 * an exiting task cleaning up the robust pi futexes.
+	 */
 	smp_mb();
 	raw_spin_unlock_wait(&tsk->pi_lock);
 

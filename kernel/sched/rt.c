@@ -2,7 +2,6 @@
 #include "sched.h"
 
 #include <linux/slab.h>
-#include <trace/events/sched.h>
 
 
 int sched_rr_timeslice = RR_TIMESLICE;
@@ -1066,48 +1065,6 @@ void dec_rt_group(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq) {}
 
 #endif 
 
-#ifdef CONFIG_SCHED_HMP
-
-static void
-inc_hmp_sched_stats_rt(struct rq *rq, struct task_struct *p)
-{
-	inc_cumulative_runnable_avg(&rq->hmp_stats, p);
-}
-
-static void
-dec_hmp_sched_stats_rt(struct rq *rq, struct task_struct *p)
-{
-	dec_cumulative_runnable_avg(&rq->hmp_stats, p);
-}
-
-#ifdef CONFIG_SCHED_QHMP
-static void
-fixup_hmp_sched_stats_rt(struct rq *rq, struct task_struct *p,
-			 u32 new_task_load)
-{
-	fixup_cumulative_runnable_avg(&rq->hmp_stats, p, new_task_load);
-}
-#else
-static void
-fixup_hmp_sched_stats_rt(struct rq *rq, struct task_struct *p,
-			 u32 new_task_load)
-{
-	s64 task_load_delta = (s64)new_task_load - task_load(p);
-
-	fixup_cumulative_runnable_avg(&rq->hmp_stats, p, task_load_delta);
-}
-#endif
-
-#else	
-
-static inline void
-inc_hmp_sched_stats_rt(struct rq *rq, struct task_struct *p) { }
-
-static inline void
-dec_hmp_sched_stats_rt(struct rq *rq, struct task_struct *p) { }
-
-#endif	
-
 static inline
 unsigned int rt_se_nr_running(struct sched_rt_entity *rt_se)
 {
@@ -1226,7 +1183,6 @@ enqueue_task_rt(struct rq *rq, struct task_struct *p, int flags)
 		rt_se->timeout = 0;
 
 	enqueue_rt_entity(rt_se, flags & ENQUEUE_HEAD);
-	inc_hmp_sched_stats_rt(rq, p);
 
 	if (!task_current(rq, p) && p->nr_cpus_allowed > 1)
 		enqueue_pushable_task(rq, p);
@@ -1238,7 +1194,6 @@ static void dequeue_task_rt(struct rq *rq, struct task_struct *p, int flags)
 
 	update_curr_rt(rq);
 	dequeue_rt_entity(rt_se);
-	dec_hmp_sched_stats_rt(rq, p);
 
 	dequeue_pushable_task(rq, p);
 }
@@ -1277,20 +1232,6 @@ static void yield_task_rt(struct rq *rq)
 static int find_lowest_rq(struct task_struct *task);
 
 static int
-select_task_rq_rt_hmp(struct task_struct *p, int cpu, int sd_flag, int flags)
-{
-	int target;
-
-	rcu_read_lock();
-	target = find_lowest_rq(p);
-	if (target != -1)
-		cpu = target;
-	rcu_read_unlock();
-
-	return cpu;
-}
-
-static int
 select_task_rq_rt(struct task_struct *p, int cpu, int sd_flag, int flags)
 {
 	struct task_struct *curr;
@@ -1299,10 +1240,7 @@ select_task_rq_rt(struct task_struct *p, int cpu, int sd_flag, int flags)
 	if (p->nr_cpus_allowed == 1)
 		goto out;
 
-	if (sched_enable_hmp)
-		return select_task_rq_rt_hmp(p, cpu, sd_flag, flags);
-
-	
+	/* For anything but wake ups, just return the task_cpu */
 	if (sd_flag != SD_BALANCE_WAKE && sd_flag != SD_BALANCE_FORK)
 		goto out;
 
@@ -1385,10 +1323,6 @@ static struct task_struct *_pick_next_task_rt(struct rq *rq)
 		rt_rq = group_rt_rq(rt_se);
 	} while (rt_rq);
 
-	if (rq->skip_clock_update > 0) {
-		rq->skip_clock_update = 0;
-		update_rq_clock(rq);
-	}
 	p = rt_task_of(rt_se);
 	p->se.exec_start = rq_clock_task(rq);
 
@@ -1464,71 +1398,6 @@ static struct task_struct *pick_highest_pushable_task(struct rq *rq, int cpu)
 
 static DEFINE_PER_CPU(cpumask_var_t, local_cpu_mask);
 
-#ifdef CONFIG_SCHED_HMP
-
-static int find_lowest_rq_hmp(struct task_struct *task)
-{
-	struct cpumask *lowest_mask = __get_cpu_var(local_cpu_mask);
-	struct cpumask candidate_mask = CPU_MASK_NONE;
-	struct sched_cluster *cluster;
-	int best_cpu = -1;
-	int prev_cpu = task_cpu(task);
-	u64 cpu_load, min_load = ULLONG_MAX;
-	int i;
-	int restrict_cluster = sysctl_sched_restrict_cluster_spill;
-
-	
-	if (unlikely(!lowest_mask))
-		return best_cpu;
-
-	if (task->nr_cpus_allowed == 1)
-		return best_cpu; 
-
-	if (!cpupri_find(&task_rq(task)->rd->cpupri, task, lowest_mask))
-		return best_cpu; 
-
-
-	for_each_sched_cluster(cluster) {
-		cpumask_and(&candidate_mask, &cluster->cpus, lowest_mask);
-
-		if (cpumask_empty(&candidate_mask))
-			continue;
-
-		for_each_cpu(i, &candidate_mask) {
-			if (sched_cpu_high_irqload(i))
-				continue;
-
-			if (cpu_rq(i)->budget == 0)
-				continue;
-
-			cpu_load = cpu_rq(i)->hmp_stats.cumulative_runnable_avg;
-			if (!restrict_cluster)
-				cpu_load = scale_load_to_cpu(cpu_load, i);
-
-			if (cpu_load < min_load ||
-				(cpu_load == min_load &&
-				(i == prev_cpu || (best_cpu != prev_cpu &&
-				cpus_share_cache(prev_cpu, i))))) {
-				min_load = cpu_load;
-				best_cpu = i;
-			}
-		}
-		if (restrict_cluster && best_cpu != -1)
-			break;
-	}
-
-	return best_cpu;
-}
-
-#else	
-
-static int find_lowest_rq_hmp(struct task_struct *task)
-{
-	return -1;
-}
-
-#endif	
-
 static int find_lowest_rq(struct task_struct *task)
 {
 	struct sched_domain *sd;
@@ -1536,10 +1405,7 @@ static int find_lowest_rq(struct task_struct *task)
 	int this_cpu = smp_processor_id();
 	int cpu      = task_cpu(task);
 
-	if (sched_enable_hmp)
-		return find_lowest_rq_hmp(task);
-
-	
+	/* Make sure the mask is initialized first */
 	if (unlikely(!lowest_mask))
 		return -1;
 
@@ -1691,9 +1557,7 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
-	next_task->on_rq = TASK_ON_RQ_MIGRATING;
 	set_task_cpu(next_task, lowest_rq->cpu);
-	next_task->on_rq = TASK_ON_RQ_QUEUED;
 	activate_task(lowest_rq, next_task, 0);
 	ret = 1;
 
@@ -1749,9 +1613,7 @@ static int pull_rt_task(struct rq *this_rq)
 			ret = 1;
 
 			deactivate_task(src_rq, p, 0);
-			p->on_rq = TASK_ON_RQ_MIGRATING;
 			set_task_cpu(p, this_cpu);
-			p->on_rq = TASK_ON_RQ_QUEUED;
 			activate_task(this_rq, p, 0);
 		}
 skip:
@@ -1848,8 +1710,7 @@ void __init init_sched_rt_class(void)
 					GFP_KERNEL, cpu_to_node(i));
 	}
 }
-
-#endif 
+#endif /* CONFIG_SMP */
 
 static void switched_to_rt(struct rq *rq, struct task_struct *p)
 {
@@ -1986,11 +1847,6 @@ const struct sched_class rt_sched_class = {
 	.switched_to		= switched_to_rt,
 
 	.update_curr		= update_curr_rt,
-#ifdef CONFIG_SCHED_HMP
-	.inc_hmp_sched_stats	= inc_hmp_sched_stats_rt,
-	.dec_hmp_sched_stats	= dec_hmp_sched_stats_rt,
-	.fixup_hmp_sched_stats	= fixup_hmp_sched_stats_rt,
-#endif
 };
 
 #ifdef CONFIG_SCHED_DEBUG

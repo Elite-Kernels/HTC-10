@@ -120,9 +120,6 @@ extern unsigned long nr_iowait(void);
 extern unsigned long nr_iowait_cpu(int cpu);
 extern void get_iowait_load(unsigned long *nr_waiters, unsigned long *load);
 
-extern void sched_update_nr_prod(int cpu, long delta, bool inc);
-extern void sched_get_nr_running_avg(int *avg, int *iowait_avg, int *big_avg);
-
 extern void calc_global_load(unsigned long ticks);
 extern void update_cpu_load_nohz(void);
 
@@ -189,17 +186,6 @@ extern char ___assert_task_state[1 - 2*!!(
 	set_mb(current->state, (state_value))
 
 #define TASK_COMM_LEN 16
-
-extern const char *sched_window_reset_reasons[];
-
-enum task_event {
-	PUT_PREV_TASK   = 0,
-	PICK_NEXT_TASK  = 1,
-	TASK_WAKE       = 2,
-	TASK_MIGRATE    = 3,
-	TASK_UPDATE     = 4,
-	IRQ_UPDATE	= 5,
-};
 
 #include <linux/spinlock.h>
 
@@ -842,9 +828,6 @@ struct load_weight {
 
 struct sched_avg {
 	u32 runnable_avg_sum, runnable_avg_period;
-#ifdef CONFIG_SCHED_HMP
-	u32 runnable_avg_sum_scaled;
-#endif
 	u64 last_runnable_update;
 	s64 decay_count;
 	unsigned long load_avg_contrib;
@@ -885,18 +868,6 @@ struct sched_statistics {
 	u64			nr_wakeups_idle;
 };
 #endif
-
-#define RAVG_HIST_SIZE_MAX  5
-
-struct ravg {
-	u64 mark_start;
-	u32 sum, demand;
-	u32 sum_history[RAVG_HIST_SIZE_MAX];
-#ifdef CONFIG_SCHED_FREQ_INPUT
-	u32 curr_window, prev_window;
-	u16 active_windows;
-#endif
-};
 
 struct sched_entity {
 	struct load_weight	load;		
@@ -1002,17 +973,6 @@ struct task_struct {
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
-#ifdef CONFIG_SCHED_HMP
-	struct ravg ravg;
-	u32 init_load_pct;
-	u64 last_wake_ts;
-	u64 last_switch_out_ts;
-#ifdef CONFIG_SCHED_QHMP
-	u64 run_start;
-#endif
-	struct related_thread_group *grp;
-	struct list_head grp_list;
-#endif
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group *sched_task_group;
 #endif
@@ -1565,73 +1525,48 @@ extern void thread_group_cputime_adjusted(struct task_struct *p, cputime_t *ut, 
 extern int task_free_register(struct notifier_block *n);
 extern int task_free_unregister(struct notifier_block *n);
 
-struct sched_load {
-	unsigned long prev_load;
-	unsigned long new_task_load;
-};
+/*
+ * Per process flags
+ */
+#define PF_EXITING	0x00000004	/* getting shut down */
+#define PF_EXITPIDONE	0x00000008	/* pi exit done on shut down */
+#define PF_VCPU		0x00000010	/* I'm a virtual CPU */
+#define PF_WQ_WORKER	0x00000020	/* I'm a workqueue worker */
+#define PF_FORKNOEXEC	0x00000040	/* forked but didn't exec */
+#define PF_MCE_PROCESS  0x00000080      /* process policy on mce errors */
+#define PF_SUPERPRIV	0x00000100	/* used super-user privileges */
+#define PF_DUMPCORE	0x00000200	/* dumped core */
+#define PF_SIGNALED	0x00000400	/* killed by a signal */
+#define PF_MEMALLOC	0x00000800	/* Allocating memory */
+#define PF_NPROC_EXCEEDED 0x00001000	/* set_user noticed that RLIMIT_NPROC was exceeded */
+#define PF_USED_MATH	0x00002000	/* if unset the fpu must be initialized before use */
+#define PF_USED_ASYNC	0x00004000	/* used async_schedule*(), used by module init */
+#define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
+#define PF_FROZEN	0x00010000	/* frozen for system suspend */
+#define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */
+#define PF_KSWAPD	0x00040000	/* I am kswapd */
+#define PF_MEMALLOC_NOIO 0x00080000	/* Allocating memory without IO involved */
+#define PF_LESS_THROTTLE 0x00100000	/* Throttle me less: I clean memory */
+#define PF_KTHREAD	0x00200000	/* I am a kernel thread */
+#define PF_RANDOMIZE	0x00400000	/* randomize virtual address space */
+#define PF_SWAPWRITE	0x00800000	/* Allowed to write to swap */
+#define PF_NO_SETAFFINITY 0x04000000	/* Userland is not allowed to meddle with cpus_allowed */
+#define PF_MCE_EARLY    0x08000000      /* Early kill for mce process policy */
+#define PF_MUTEX_TESTER	0x20000000	/* Thread belongs to the rt mutex tester */
+#define PF_FREEZER_SKIP	0x40000000	/* Freezer should not count it as freezable */
+#define PF_SUSPEND_TASK 0x80000000      /* this thread called freeze_processes and should not be frozen */
 
-#if defined(CONFIG_SCHED_FREQ_INPUT)
-extern int sched_set_window(u64 window_start, unsigned int window_size);
-extern unsigned long sched_get_busy(int cpu);
-extern void sched_get_cpus_busy(struct sched_load *busy,
-				const struct cpumask *query_cpus);
-extern void sched_set_io_is_busy(int val);
-#ifdef CONFIG_SCHED_QHMP
-static inline int sched_update_freq_max_load(const cpumask_t *cpumask)
-{
-	return 0;
-}
-#else
-int sched_update_freq_max_load(const cpumask_t *cpumask);
-#endif
-#else
-static inline int sched_set_window(u64 window_start, unsigned int window_size)
-{
-	return -EINVAL;
-}
-static inline unsigned long sched_get_busy(int cpu)
-{
-	return 0;
-}
-static inline void sched_get_cpus_busy(struct sched_load *busy,
-				       const struct cpumask *query_cpus) {};
-static inline void sched_set_io_is_busy(int val) {};
-
-static inline int sched_update_freq_max_load(const cpumask_t *cpumask)
-{
-	return 0;
-}
-#endif
-
-#define PF_WAKE_UP_IDLE 0x00000002	
-#define PF_EXITING	0x00000004	
-#define PF_EXITPIDONE	0x00000008	
-#define PF_VCPU		0x00000010	
-#define PF_WQ_WORKER	0x00000020	
-#define PF_FORKNOEXEC	0x00000040	
-#define PF_MCE_PROCESS  0x00000080      
-#define PF_SUPERPRIV	0x00000100	
-#define PF_DUMPCORE	0x00000200	
-#define PF_SIGNALED	0x00000400	
-#define PF_MEMALLOC	0x00000800	
-#define PF_NPROC_EXCEEDED 0x00001000	
-#define PF_USED_MATH	0x00002000	
-#define PF_USED_ASYNC	0x00004000	
-#define PF_NOFREEZE	0x00008000	
-#define PF_FROZEN	0x00010000	
-#define PF_FSTRANS	0x00020000	
-#define PF_KSWAPD	0x00040000	
-#define PF_MEMALLOC_NOIO 0x00080000	
-#define PF_LESS_THROTTLE 0x00100000	
-#define PF_KTHREAD	0x00200000	
-#define PF_RANDOMIZE	0x00400000	
-#define PF_SWAPWRITE	0x00800000	
-#define PF_NO_SETAFFINITY 0x04000000	
-#define PF_MCE_EARLY    0x08000000      
-#define PF_MUTEX_TESTER	0x20000000	
-#define PF_FREEZER_SKIP	0x40000000	
-#define PF_SUSPEND_TASK 0x80000000      
-
+/*
+ * Only the _current_ task can read/write to tsk->flags, but other
+ * tasks can access tsk->flags in readonly mode for example
+ * with tsk_used_math (like during threaded core dumping).
+ * There is however an exception to this rule during ptrace
+ * or during fork: the ptracer task is allowed to write to the
+ * child->flags of its traced child (same goes for fork, the parent
+ * can write to the child->flags), because we're guaranteed the
+ * child is not running and in turn not changing child->flags
+ * at the same time the parent does it.
+ */
 #define clear_stopped_child_used_math(child) do { (child)->flags &= ~PF_USED_MATH; } while (0)
 #define set_stopped_child_used_math(child) do { (child)->flags |= PF_USED_MATH; } while (0)
 #define clear_used_math() clear_stopped_child_used_math(current)
@@ -1747,8 +1682,6 @@ extern int set_cpus_allowed_ptr(struct task_struct *p,
 				const struct cpumask *new_mask);
 extern void sched_set_cpu_cstate(int cpu, int cstate,
 			 int wakeup_energy, int wakeup_latency);
-extern void sched_set_cluster_dstate(const cpumask_t *cluster_cpus, int dstate,
-				int wakeup_energy, int wakeup_latency);
 #else
 static inline void do_set_cpus_allowed(struct task_struct *p,
 				      const struct cpumask *new_mask)
@@ -1765,47 +1698,12 @@ static inline void
 sched_set_cpu_cstate(int cpu, int cstate, int wakeup_energy, int wakeup_latency)
 {
 }
+#endif
 
-static inline void sched_set_cluster_dstate(const cpumask_t *cluster_cpus,
-			int dstate, int wakeup_energy, int wakeup_latency)
+static inline void set_wake_up_idle(bool enabled)
 {
+	/* do nothing yet for EAS */
 }
-#endif
-
-extern int sched_set_wake_up_idle(struct task_struct *p, int wake_up_idle);
-extern u32 sched_get_wake_up_idle(struct task_struct *p);
-extern int sched_set_group_id(struct task_struct *p, unsigned int group_id);
-extern unsigned int sched_get_group_id(struct task_struct *p);
-
-#ifdef CONFIG_SCHED_HMP
-
-extern int sched_set_boost(int enable);
-extern int sched_set_init_task_load(struct task_struct *p, int init_load_pct);
-extern u32 sched_get_init_task_load(struct task_struct *p);
-extern int sched_set_static_cpu_pwr_cost(int cpu, unsigned int cost);
-extern unsigned int sched_get_static_cpu_pwr_cost(int cpu);
-extern int sched_set_static_cluster_pwr_cost(int cpu, unsigned int cost);
-extern unsigned int sched_get_static_cluster_pwr_cost(int cpu);
-extern int sched_set_cpu_budget(int cpu, int nr_run);
-extern int sched_get_cpu_budget(int cpu);
-#ifdef CONFIG_SCHED_QHMP
-extern int sched_set_cpu_prefer_idle(int cpu, int prefer_idle);
-extern int sched_get_cpu_prefer_idle(int cpu);
-extern int sched_set_cpu_mostly_idle_load(int cpu, int mostly_idle_pct);
-extern int sched_get_cpu_mostly_idle_load(int cpu);
-extern int sched_set_cpu_mostly_idle_nr_run(int cpu, int nr_run);
-extern int sched_get_cpu_mostly_idle_nr_run(int cpu);
-extern int
-sched_set_cpu_mostly_idle_freq(int cpu, unsigned int mostly_idle_freq);
-extern unsigned int sched_get_cpu_mostly_idle_freq(int cpu);
-#endif
-
-#else
-static inline int sched_set_boost(int enable)
-{
-	return -EINVAL;
-}
-#endif
 
 #ifdef CONFIG_NO_HZ_COMMON
 void calc_load_enter_idle(void);
@@ -1814,14 +1712,6 @@ void calc_load_exit_idle(void);
 static inline void calc_load_enter_idle(void) { }
 static inline void calc_load_exit_idle(void) { }
 #endif 
-
-static inline void set_wake_up_idle(bool enabled)
-{
-	if (enabled)
-		current->flags |= PF_WAKE_UP_IDLE;
-	else
-		current->flags &= ~PF_WAKE_UP_IDLE;
-}
 
 #ifndef CONFIG_CPUMASK_OFFSTACK
 static inline int set_cpus_allowed(struct task_struct *p, cpumask_t new_mask)
@@ -1835,10 +1725,8 @@ extern u64 cpu_clock(int cpu);
 extern u64 local_clock(void);
 extern u64 sched_clock_cpu(int cpu);
 
-extern u64 sched_ktime_clock(void);
 
 extern void sched_clock_init(void);
-extern int sched_clock_initialized(void);
 
 #ifndef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
 static inline void sched_clock_tick(void)
@@ -1873,7 +1761,8 @@ static inline void disable_sched_clock_irqtime(void) {}
 extern unsigned long long
 task_sched_runtime(struct task_struct *task);
 
-#if defined(CONFIG_SMP)
+/* sched_exec is called by processes performing an exec */
+#ifdef CONFIG_SMP
 extern void sched_exec(void);
 #else
 #define sched_exec()   {}
@@ -1992,11 +1881,6 @@ extern void wake_up_new_task(struct task_struct *tsk);
 #endif
 extern int sched_fork(unsigned long clone_flags, struct task_struct *p);
 extern void sched_dead(struct task_struct *p);
-#ifdef CONFIG_SCHED_HMP
-extern void sched_exit(struct task_struct *p);
-#else
-static inline void sched_exit(struct task_struct *p) { }
-#endif
 
 extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
@@ -2387,6 +2271,12 @@ extern int _cond_resched(void);
 
 extern int __cond_resched_lock(spinlock_t *lock);
 
+#ifdef CONFIG_PREEMPT_COUNT
+#define PREEMPT_LOCK_OFFSET	PREEMPT_OFFSET
+#else
+#define PREEMPT_LOCK_OFFSET	0
+#endif
+
 #define cond_resched_lock(lock) ({				\
 	__might_sleep(__FILE__, __LINE__, PREEMPT_LOCK_OFFSET);	\
 	__cond_resched_lock(lock);				\
@@ -2523,15 +2413,6 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 }
 
 #endif 
-
-extern struct atomic_notifier_head migration_notifier_head;
-struct migration_notify_data {
-	int src_cpu;
-	int dest_cpu;
-	int load;
-};
-
-extern struct atomic_notifier_head load_alert_notifier_head;
 
 extern long sched_setaffinity(pid_t pid, const struct cpumask *new_mask);
 extern long sched_getaffinity(pid_t pid, struct cpumask *mask);
