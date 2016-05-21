@@ -30,7 +30,7 @@
   m=$k/out/$c/system/lib/modules
   z=$c-$today
 
-TOOLCHAIN=/home/forrest/kernel/gcc-4.9_aarch64/bin/aarch64-linux-android-
+TOOLCHAIN=/home/forrest/kernel/linaro-4.9_aarch64/bin/aarch64-linux-android-
 export ARCH=arm64
 export SUBARCH=arm64
 
@@ -42,8 +42,9 @@ find ./ -name '*~' | xargs rm
 # rm compile.log
 
 # make kernel
-make 'msm-auto-perf_defconfig'
-make -j`grep 'processor' /proc/cpuinfo | wc -l` CROSS_COMPILE=$TOOLCHAIN #>> compile.log 2>&1 || exit -1
+
+make ARCH=arm64 CROSS_COMPILE=$TOOLCHAIN O=out msm_defconfig
+make ARCH=arm64 CROSS_COMPILE=$TOOLCHAIN O=out -j`grep 'processor' /proc/cpuinfo | wc -l`
 
 # Grab zImage-dtb
    echo ""
