@@ -8,8 +8,8 @@
   today=$(date +"%m_%d_%Y")
 
 # Clean old builds
-   echo "Clean"
-     rm -rf $k/out
+#   echo "Clean"
+#     rm -rf $k/out
 #     make clean
 
 # Setup the build
@@ -55,7 +55,7 @@ make ARCH=arm64 CROSS_COMPILE=$TOOLCHAIN O=out -j`grep 'processor' /proc/cpuinfo
    echo ""
    echo "<<>><<>>  Collecting Image.gz-dtb <<>><<>>"
    echo ""
-   cp $k/arch/arm64/boot/Image.gz-dtb out/$c/Image.gz-dtb
+   cp $k/out/arch/arm64/boot/Image.gz-dtb out/$c/Image.gz-dtb
    done
    
 # Build Zip
