@@ -9,6 +9,8 @@ do.initd=1
 do.system=0
 do.cleanup=0
 device.name1=htc_pmewl
+device.name2=htc_pmeuhl
+device.name3=htc_pmewhl
 
 # shell variables
 block=/dev/block/platform/soc/7464900.sdhci/by-name/boot;
