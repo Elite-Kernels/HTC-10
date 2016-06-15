@@ -1055,9 +1055,10 @@ static int find_suitable_fallback(struct free_area *area, unsigned int current_o
 }
 
 static inline struct page *
-__rmqueue_fallback_order(struct zone *zone, unsigned int order, int start_migratetype, unsigned int current_order)
+__rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
 {
 	struct free_area *area;
+	unsigned int current_order;
 	struct page *page;
 	int fallback_mt;
 	bool can_steal;
