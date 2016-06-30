@@ -708,6 +708,7 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 	},
+#ifdef CONFIG_SCHED_QHMP
 	{
 		.procname	= "sched_max_latency_us",
 		.mode		= 0644,
