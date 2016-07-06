@@ -1747,6 +1747,9 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 		hap->state = 0;
 	} else {
 		VIB_INFO_LOG("en=%d\n", value);
+#if 1
+		register_haptic(value);
+#endif
 		value = (value > hap->timeout_ms ?
 				 hap->timeout_ms : value);
 		if(hap->soft_mode_enable) {
