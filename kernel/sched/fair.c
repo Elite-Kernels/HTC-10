@@ -5638,6 +5638,10 @@ static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
 		 */
 		bool boosted = schedtune_task_boost(p) > 0;
 		bool prefer_idle = schedtune_prefer_idle(p) > 0;
+#else
+		bool boosted = 0;
+		bool prefer_idle = 0;
+#endif
 		int tmp_target = find_best_target(p, boosted, prefer_idle);
 		if (tmp_target >= 0) {
 			target_cpu = tmp_target;
