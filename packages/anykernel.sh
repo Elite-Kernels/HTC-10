@@ -7,6 +7,7 @@ kernel.string=-Elite
 do.devicecheck=1
 do.initd=1
 do.system=0
+do.scripts=1
 do.cleanup=0
 device.name1=htc_pmewl
 device.name2=htc_pmeuhl
