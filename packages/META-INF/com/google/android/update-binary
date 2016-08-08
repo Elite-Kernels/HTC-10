@@ -89,18 +89,18 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.devicecheck)" == 1 ]; then
 fi;
 
 ui_print "Pushing Scripts...";
-if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.system)" == 1 ]; then
+if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.scripts)" == 1 ]; then
   ui_print " ";
   rm /system/etc/init.d/92Elite;
   rm /system/su.d/Elite.sh;  
-  if [ -d "$system/elite" ]
+  if [ -d "$system/su.d" ]
   then  
-    cp -rf /tmp/anykernel/system/elite/* /system/elite/;
-    set_perm_recursive 0 0 0755 0755 /system/elite;
+    cp -rf /tmp/anykernel/system/su.d/* /system/su.d/;
+    set_perm_recursive 0 0 0755 0755 /system/su.d;
   else
-    mkdir /system/elite;
-    cp -rf /tmp/anykernel/system/elite/* /system/elite/;
-    set_perm_recursive 0 0 0755 0755 /system/elite;
+    mkdir /system/su.d;
+    cp -rf /tmp/anykernel/system/su.d/* /system/su.d/;
+    set_perm_recursive 0 0 0755 0755 /system/su.d;
   fi;
 fi;
 
