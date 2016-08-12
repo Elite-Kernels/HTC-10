@@ -72,6 +72,15 @@ echo "0" > /sys/kernel/fast_charge/force_fast_charge
 # 3 - aggressive
 echo "1" > /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost
 
+# Set Wakelocks
+ # set to 1 for stock
+ # set to 0 to disable
+ # higher = less wakelocks
+ # echo 0 > /sys/module/bcmdhd/parameters/wlrx_divide
+ echo 8 > /sys/module/bcmdhd/parameters/wlrx_divide
+ # echo 0 > /sys/module/bcmdhd/parameters/wlctrl_divide
+ echo 8 > /sys/module/bcmdhd/parameters/wlctrl_divide
+
 chmod 644 /sys/block/mmcblk0/queue/scheduler
 chmod 644 /sys/block/mmcblk0/queue/read_ahead_kb
 chmod 644 /sys/class/leds/button-backlight/bln
