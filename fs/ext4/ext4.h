@@ -2427,4 +2427,7 @@ extern void ext4_resize_end(struct super_block *sb);
 
 #endif	
 
+#define EFSBADCRC	EBADMSG		
+#define EFSCORRUPTED	EUCLEAN		
+
 #endif	
