@@ -4999,6 +4999,7 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 	struct scsi_cmnd *cmd;
 	int result;
 	int index;
+	struct request *req;
 
 	for_each_set_bit(index, &completed_reqs, hba->nutrs) {
 		lrbp = &hba->lrb[index];
@@ -5014,10 +5015,10 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 			update_req_stats(hba, lrbp);
 			/* Mark completed command as NULL in LRB */
 			lrbp->cmd = NULL;
-<<<<<<< HEAD
 			__ufshcd_release(hba, false);
 			__ufshcd_hibern8_release(hba, false);
-			if (cmd->request)
+			req = cmd->request;
+			if (req) {
 				/* Update IO svc time latency histogram */
 				if (req->lat_hist_enabled) {
 					ktime_t completion;
