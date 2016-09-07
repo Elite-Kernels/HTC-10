@@ -16,6 +16,7 @@
 #include <linux/device.h>
 #include <linux/devfreq.h>
 #include <linux/fault-inject.h>
+#include <linux/blkdev.h>
 
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
@@ -492,6 +493,9 @@ struct mmc_host {
 	u32			cmdq_thist_enabled;
 	void *cmdq_private;
 	struct mmc_request	*err_mrq;
+	int			latency_hist_enabled;
+	struct io_latency_state io_lat_s;
+
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
