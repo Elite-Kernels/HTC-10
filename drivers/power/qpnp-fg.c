@@ -2521,7 +2521,7 @@ out:
 	return rc;
 }
 
-#define SANITY_CHECK_PERIOD_MS	5000
+#define SANITY_CHECK_PERIOD_MS	60000
 static void check_sanity_work(struct work_struct *work)
 {
 	struct fg_chip *chip = container_of(work,

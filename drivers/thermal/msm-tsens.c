@@ -2582,7 +2582,7 @@ static void monitor_tsens_status(struct work_struct *work)
 		}
 	}
 	if (monitor_tsense_wq) {
-		queue_delayed_work(monitor_tsense_wq, &monitor_tsens_status_worker, msecs_to_jiffies(60000));
+		queue_delayed_work(monitor_tsense_wq, &monitor_tsens_status_worker, msecs_to_jiffies(300000));
 	}
 }
 #endif
