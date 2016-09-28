@@ -11252,12 +11252,14 @@ int dhd_os_send_hang_message(dhd_pub_t *dhdp)
 		DHD_OS_WAKE_LOCK(dhdp);
 
 		DHD_GENERAL_LOCK(dhdp, flags);
+#ifdef DHD_FW_COREDUMP
 		if (dhdp->memdump_in_progress) {
 			DHD_ERROR(("%s: memdump in progress, sending hang later.\n", __FUNCTION__));
 			dhdp->memdump_with_hang_pending = 1;
 			DHD_GENERAL_UNLOCK(dhdp, flags);
 			return ret;
 		}
+#endif
 		if (dhdp->busstate == DHD_BUS_DATA) {
 			disable_intr = true;
 		}
@@ -11861,7 +11863,7 @@ write_to_file(dhd_pub_t *dhd, uint8 *buf, int size)
 	fp->f_op->write(fp, buf, size, &pos);
 
 #if defined(CUSTOMER_HW_ONE) && defined(CONFIG_DHD_USE_STATIC_BUF) && \
-	defined(DHD_USE_STATIC_MEMDUMP)
+	defined(DHD_USE_STATIC_MEMDUMP) && defined(DHD_FW_COREDUMP)
 	fp->f_op->fsync(fp, 0, MAX_BUFF_SIZE-1, 1);
 #endif 
 
