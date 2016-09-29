@@ -363,11 +363,7 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	for (i = find_first_bit((unsigned long *)pending, gic->irq_nr);
 		i < gic->irq_nr;
 		i = find_next_bit((unsigned long *)pending, gic->irq_nr, i+1)) {
-#ifdef CONFIG_HTC_POWER_DEBUG
 		pr_info("[WAKEUP] Resume caused by gic-%d\n",i);
-#else
-		pr_warning("%s: %d triggered %s\n", __func__, i);
-#endif
 	}
 }
 
