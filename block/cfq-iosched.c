@@ -2884,7 +2884,6 @@ static void cfq_init_prio_data(struct cfq_queue *cfqq, struct cfq_io_cq *cic)
 	struct task_struct *tsk = current;
 	int ioprio_class;
 
-#ifdef CONFIG_HTC_PNPMGR
 	if (launch_event_enabled)
 	{
 		int bg;
@@ -2898,7 +2897,6 @@ static void cfq_init_prio_data(struct cfq_queue *cfqq, struct cfq_io_cq *cic)
 			return;
 		}
 	}
-#endif	
 
 	if (!cfq_cfqq_prio_changed(cfqq))
 		return;
