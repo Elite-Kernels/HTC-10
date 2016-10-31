@@ -103,16 +103,6 @@ void fpsimd_settings_disable(void)
 	clear_app_setting_bit(FP_SIMD_BIT);
 }
 
-void fpsimd_settings_enable(void)
-{
-	set_app_setting_bit(FP_SIMD_BIT);
-}
-
-void fpsimd_settings_disable(void)
-{
-	clear_app_setting_bit(FP_SIMD_BIT);
-}
-
 /*
  * Trapped FP/ASIMD access.
  */

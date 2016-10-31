@@ -1338,7 +1338,6 @@ struct task_struct {
 	unsigned long trace;
 	
 	unsigned long trace_recursion;
-#endif 
 #endif /* CONFIG_TRACING */
 #ifdef CONFIG_KCOV
 	/* Coverage collection mode enabled for this task (0 if disabled). */
