@@ -314,7 +314,6 @@ static inline void task_cap(struct seq_file *m, struct task_struct *p)
 	cap_permitted	= cred->cap_permitted;
 	cap_effective	= cred->cap_effective;
 	cap_bset	= cred->cap_bset;
-	cap_ambient	= cred->cap_ambient;
 	rcu_read_unlock();
 
 	render_cap_t(m, "CapInh:\t", &cap_inheritable);

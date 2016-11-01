@@ -2444,18 +2444,6 @@ static const struct pid_entry tgid_base_stuff[] = {
 	ONE("status",     S_IRUGO, proc_pid_status),
 	ONE("personality", S_IRUSR, proc_pid_personality),
 	ONE("limits",	  S_IRUGO, proc_pid_limits),
-<<<<<<< HEAD
-#ifdef CONFIG_SMP
-	REG("sched_wake_up_idle",      S_IRUGO|S_IWUSR, proc_pid_sched_wake_up_idle_operations),
-#endif
-#ifdef CONFIG_SCHED_HMP
-	REG("sched_init_task_load",      S_IRUGO|S_IWUSR, proc_pid_sched_init_task_load_operations),
-#ifndef CONFIG_SCHED_QHMP
-	REG("sched_group_id",      S_IRUGO|S_IWUSR, proc_pid_sched_group_id_operations),
-#endif
-#endif
-=======
->>>>>>> 573f31e... sched: Revert HMP and some MSM specific features
 #ifdef CONFIG_SCHED_DEBUG
 	REG("sched",      S_IRUGO|S_IWUSR, proc_pid_sched_operations),
 #endif

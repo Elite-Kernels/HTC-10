@@ -15,11 +15,16 @@
 #include <linux/seq_file.h>
 #include <linux/kallsyms.h>
 #include <linux/utsname.h>
+#include <linux/mempolicy.h>
 
 #include "sched.h"
 
 static DEFINE_SPINLOCK(sched_debug_lock);
 
+/*
+ * This allows printing both to /proc/sched_debug and
+ * to the console
+ */
 #define SEQ_printf(m, x...)			\
  do {						\
 	if (m)					\
@@ -28,6 +33,9 @@ static DEFINE_SPINLOCK(sched_debug_lock);
 		printk(x);			\
  } while (0)
 
+/*
+ * Ease the printing of nsec fields:
+ */
 static long long nsec_high(unsigned long long nsec)
 {
 	if ((long long)nsec < 0) {
@@ -123,12 +131,14 @@ print_task(struct seq_file *m, struct rq *rq, struct task_struct *p)
 	SEQ_printf(m, "%15Ld %15Ld %15Ld.%06ld %15Ld.%06ld %15Ld.%06ld",
 		0LL, 0LL, 0LL, 0L, 0LL, 0L, 0LL, 0L);
 #endif
+#ifdef CONFIG_NUMA_BALANCING
+	SEQ_printf(m, " %d", task_node(p));
+#endif
 #ifdef CONFIG_CGROUP_SCHED
 	SEQ_printf(m, " %s", task_group_path(task_group(p)));
 #endif
 
 	SEQ_printf(m, "\n");
-	if (!m) show_stack(p, NULL);
 }
 
 static void print_rq(struct seq_file *m, struct rq *rq, int rq_cpu)
@@ -144,7 +154,7 @@ static void print_rq(struct seq_file *m, struct rq *rq, int rq_cpu)
 
 	rcu_read_lock();
 	for_each_process_thread(g, p) {
-		if (!p->on_rq || task_cpu(p) != rq_cpu)
+		if (task_cpu(p) != rq_cpu)
 			continue;
 
 		print_task(m, rq, p);
@@ -340,7 +350,7 @@ static void sched_debug_header(struct seq_file *m)
 	cpu_clk = local_clock();
 	local_irq_restore(flags);
 
-	SEQ_printf(m, "Sched Debug Version: v0.10, %s %.*s\n",
+	SEQ_printf(m, "Sched Debug Version: v0.11, %s %.*s\n",
 		init_utsname()->release,
 		(int)strcspn(init_utsname()->version, " "),
 		init_utsname()->version);
@@ -403,6 +413,13 @@ void sysrq_sched_debug_show(void)
 
 }
 
+/*
+ * This itererator needs some explanation.
+ * It returns 1 for the header position.
+ * This means 2 is cpu 0.
+ * In a hotplugged system some cpus, including cpu 0, may be missing so we have
+ * to use cpumask_* to iterate over the cpus.
+ */
 static void *sched_debug_start(struct seq_file *file, loff_t *offset)
 {
 	unsigned long n = *offset;
@@ -475,6 +492,56 @@ static int __init init_sched_debug_procfs(void)
 }
 
 __initcall(init_sched_debug_procfs);
+
+#define __P(F) \
+	SEQ_printf(m, "%-45s:%21Ld\n", #F, (long long)F)
+#define P(F) \
+	SEQ_printf(m, "%-45s:%21Ld\n", #F, (long long)p->F)
+#define __PN(F) \
+	SEQ_printf(m, "%-45s:%14Ld.%06ld\n", #F, SPLIT_NS((long long)F))
+#define PN(F) \
+	SEQ_printf(m, "%-45s:%14Ld.%06ld\n", #F, SPLIT_NS((long long)p->F))
+
+
+static void sched_show_numa(struct task_struct *p, struct seq_file *m)
+{
+#ifdef CONFIG_NUMA_BALANCING
+	struct mempolicy *pol;
+	int node, i;
+
+	if (p->mm)
+		P(mm->numa_scan_seq);
+
+	task_lock(p);
+	pol = p->mempolicy;
+	if (pol && !(pol->flags & MPOL_F_MORON))
+		pol = NULL;
+	mpol_get(pol);
+	task_unlock(p);
+
+	SEQ_printf(m, "numa_migrations, %ld\n", xchg(&p->numa_pages_migrated, 0));
+
+	for_each_online_node(node) {
+		for (i = 0; i < 2; i++) {
+			unsigned long nr_faults = -1;
+			int cpu_current, home_node;
+
+			if (p->numa_faults_memory)
+				nr_faults = p->numa_faults_memory[2*node + i];
+
+			cpu_current = !i ? (task_node(p) == node) :
+				(pol && node_isset(node, pol->v.nodes));
+
+			home_node = (p->numa_preferred_nid == node);
+
+			SEQ_printf(m, "numa_faults_memory, %d, %d, %d, %d, %ld\n",
+				i, node, cpu_current, home_node, nr_faults);
+		}
+	}
+
+	mpol_put(pol);
+#endif
+}
 
 void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 {
@@ -581,6 +648,8 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 		SEQ_printf(m, "%-45s:%21Ld\n",
 			   "clock-delta", (long long)(t1-t0));
 	}
+
+	sched_show_numa(p, m);
 }
 
 void proc_sched_set_task(struct task_struct *p)

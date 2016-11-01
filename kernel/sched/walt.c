@@ -178,6 +178,7 @@ static int __init set_walt_ravg_window(char *str)
 
 early_param("walt_ravg_window", set_walt_ravg_window);
 
+extern u64 arch_counter_get_cntpct(void);
 static void
 update_window_start(struct rq *rq, u64 wallclock)
 {
@@ -185,7 +186,14 @@ update_window_start(struct rq *rq, u64 wallclock)
 	int nr_windows;
 
 	delta = wallclock - rq->window_start;
-	BUG_ON(delta < 0);
+	/* If the MPM global timer is cleared, set delta as 0 to avoid kernel BUG happening */
+	if (delta < 0) {
+		if (arch_counter_get_cntpct() == 0)
+			delta = 0;
+		else
+			BUG_ON(1);
+	}
+
 	if (delta < walt_ravg_window)
 		return;
 
@@ -848,8 +856,14 @@ void walt_fixup_busy_time(struct task_struct *p, int new_cpu)
 		dest_rq->prev_runnable_sum += p->ravg.prev_window;
 	}
 
-	BUG_ON((s64)src_rq->prev_runnable_sum < 0);
-	BUG_ON((s64)src_rq->curr_runnable_sum < 0);
+	if ((s64)src_rq->prev_runnable_sum < 0) {
+		src_rq->prev_runnable_sum = 0;
+		WARN_ON(1);
+	}
+	if ((s64)src_rq->curr_runnable_sum < 0) {
+		src_rq->curr_runnable_sum = 0;
+		WARN_ON(1);
+	}
 
 	trace_walt_migration_update_sum(src_rq, p);
 	trace_walt_migration_update_sum(dest_rq, p);
