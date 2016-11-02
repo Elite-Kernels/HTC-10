@@ -367,9 +367,6 @@ int suspend_devices_and_enter(suspend_state_t state)
 	error = platform_suspend_begin(state);
 	if (error)
 		goto Close;
-	if (!suspend_console_deferred)
-		suspend_console();
-
 	suspend_test_start();
 	error = dpm_suspend_start(PMSG_SUSPEND);
 	if (error) {
@@ -390,8 +387,6 @@ int suspend_devices_and_enter(suspend_state_t state)
 	dpm_resume_end(PMSG_RESUME);
 	suspend_test_finish("resume devices");
 	trace_suspend_resume(TPS("resume_console"), state, true);
-	if (!suspend_console_deferred)
-		resume_console();
 	trace_suspend_resume(TPS("resume_console"), state, false);
 
  Close:

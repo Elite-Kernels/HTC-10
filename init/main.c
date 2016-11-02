@@ -902,9 +902,6 @@ static noinline void __init kernel_init_freeable(void)
 	lockup_detector_init();
 
 	smp_init();
-#ifdef CONFIG_HTC_EARLY_RTB
-	htc_early_rtb_init();
-#endif
 	sched_init_smp();
 
 	do_basic_setup();

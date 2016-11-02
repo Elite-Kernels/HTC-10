@@ -178,23 +178,12 @@ static void htc_lpm_pre_action(bool from_idle)
 {
 	int is_last_core_for_suspend = (!from_idle && cpu_online(smp_processor_id()));
 
-	if (is_last_core_for_suspend) {
-		
-		if (suspend_console_deferred)
-			suspend_console();
-	}
 }
 
 static void htc_lpm_post_action(bool from_idle)
 {
 	int is_last_core_for_suspend = (!from_idle && cpu_online(smp_processor_id()));
 
-	if (is_last_core_for_suspend) {
-		if (suspend_console_deferred)
-			resume_console();
-
-		
-	}
 }
 
 static void update_debug_pc_event(enum debug_event event, uint32_t arg1,
@@ -1394,8 +1383,6 @@ static int lpm_probe(struct platform_device *pdev)
 				__func__);
 		goto failed;
 	}
-
-	suspend_console_deferred = 1;
 
 	return 0;
 failed:
