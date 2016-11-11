@@ -356,6 +356,16 @@ kgsl_mem_entry_untrack_gpuaddr(struct kgsl_process_private *process,
 		kgsl_mmu_put_gpuaddr(pagetable, &entry->memdesc);
 }
 
+static void kgsl_mem_entry_commit_process(struct kgsl_mem_entry *entry)
+{
+	if (!entry)
+		return;
+
+	spin_lock(&entry->priv->mem_lock);
+	idr_replace(&entry->priv->mem_idr, entry, entry->id);
+	spin_unlock(&entry->priv->mem_lock);
+}
+
 int
 kgsl_mem_entry_attach_process(struct kgsl_mem_entry *entry,
 				   struct kgsl_device_private *dev_priv)
