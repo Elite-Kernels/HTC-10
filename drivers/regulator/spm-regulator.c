@@ -28,11 +28,7 @@
 #include <linux/regulator/spm-regulator.h>
 #include <soc/qcom/spm.h>
 
-#if defined(CONFIG_ARM64) || (defined(CONFIG_ARM) && defined(CONFIG_ARM_PSCI))
-	asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
-#else
-	#define __invoke_psci_fn_smc(a, b, c, d) 0
-#endif
+#define __invoke_psci_fn_smc(a, b, c, d) 0
 
 #define SPM_REGULATOR_DRIVER_NAME "qcom,spm-regulator"
 
