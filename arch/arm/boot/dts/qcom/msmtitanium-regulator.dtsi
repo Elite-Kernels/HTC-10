@@ -459,5 +459,6 @@
 		startup-delay-us = <0>;
 		enable-active-high;
 		gpio = <&tlmm 50 0>;
+		regulator-always-on;
 	};
 };

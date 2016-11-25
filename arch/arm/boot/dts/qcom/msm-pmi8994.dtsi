@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -410,6 +410,7 @@
 			qcom,ext-sense-type = <1>;
 			qcom,cold-hot-jeita-hysteresis = <20 30>;
 			qcom,fg-cutoff-voltage-mv = <3400>;
+			qcom,capacity-learning-feedback;
 
 			qcom,fg-soc@4000 {
 				status = "okay";
@@ -535,6 +536,7 @@
 			compatible = "qcom,qpnp-labibb-regulator";
 			#address-cells = <1>;
 			#size-cells = <1>;
+			qcom,pmic-revid = <&pmi8994_revid>;
 
 			ibb_regulator: qcom,ibb@dc00 {
 				reg = <0xdc00 0x100>;

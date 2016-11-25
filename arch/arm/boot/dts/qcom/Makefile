@@ -54,6 +54,7 @@ dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-cdp.dtb \
 	apq8096-v3-pmi8996-mtp.dtb \
 	apq8096-v3-liquid.dtb \
 	apq8096-v3-dragonboard.dtb \
+	apq8096-v3-mediabox.dtb \
 	apq8096-v3-sbc.dtb \
 	apq8096-v3-auto-dragonboard.dtb \
 	apq8096-v3.0-pmi8994-cdp.dtb \
@@ -88,6 +89,8 @@ dtb-$(CONFIG_ARCH_MSM8996) += \
 	msm8996-v2-htc_pme-xb.dtb \
 	msm8996-v2-htc_pme-xa.dtb \
 	msm8996-v2-htc_evm.dtb \
+	msm8996-v3-htc_pmewhl-xd.dtb \
+	msm8996-v3-htc_pmewhl-pvt.dtb \
 
 dtb-$(CONFIG_ARCH_MDM9640) += mdm9640-sim.dtb \
 	mdm9640-rumi.dtb \
