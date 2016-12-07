@@ -1246,6 +1246,8 @@
 		qcom,use-sw-aes-xts-algo;
 		qcom,use-sw-aes-ccm-algo;
 		qcom,use-sw-ahash-algo;
+		qcom,use-sw-hmac-algo;
+		qcom,use-sw-aead-algo;
 		qcom,ce-opp-freq = <100000000>;
 	};
 
@@ -1338,13 +1340,14 @@
 		qcom,fragmented-data;
 	};
 
-	qcom,bam_dmux@4044000 {
+	bam_dmux: qcom,bam_dmux@4044000 {
 		compatible = "qcom,bam_dmux";
 		reg = <0x4044000 0x19000>;
 		interrupts = <GIC_SPI 162 IRQ_TYPE_EDGE_RISING>;
 		qcom,rx-ring-size = <32>;
 		qcom,max-rx-mtu = <4096>;
 		qcom,fast-shutdown;
+		qcom,no-cpu-affinity;
 	};
 
 	sdcc1_ice: sdcc1ice@7803000 {
@@ -1760,6 +1763,7 @@
 			#size-cells = <0>;
 
 			qcom,speed-bin = <0>;
+			qcom,initial-pwrlevel = <3>;
 
 			/* TURBO */
 			qcom,gpu-pwrlevel@0 {
@@ -1821,6 +1825,7 @@
 			#size-cells = <0>;
 
 			qcom,speed-bin = <1>;
+			qcom,initial-pwrlevel = <3>;
 
 			/* TURBO */
 			qcom,gpu-pwrlevel@0 {

@@ -591,18 +591,6 @@
 	};
 };
 
-&green_led {
-	linux,name = "UserLED0";
-};
-
-&blue_led {
-	linux,name = "UserLED1";
-};
-
-&red_led {
-	linux,name = "UserLED2";
-};
-
 &spmi_bus {
 	qcom,pmi8994@2 {
 		qcom,leds@a100 { /* user3 LED */

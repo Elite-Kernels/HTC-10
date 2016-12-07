@@ -33,12 +33,8 @@ static struct cdev *uio_cdev;
 static DEFINE_IDR(uio_idr);
 static const struct file_operations uio_fops;
 
-/* Protect idr accesses */
 static DEFINE_MUTEX(minor_lock);
 
-/*
- * attributes
- */
 
 struct uio_map {
 	struct kobject kobj;
@@ -51,22 +47,22 @@ static ssize_t map_name_show(struct uio_mem *mem, char *buf)
 	if (unlikely(!mem->name))
 		mem->name = "";
 
-	return sprintf(buf, "%s\n", mem->name);
+	return snprintf(buf, PAGE_SIZE, "%s\n", mem->name);
 }
 
 static ssize_t map_addr_show(struct uio_mem *mem, char *buf)
 {
-	return sprintf(buf, "0x%llx\n", (unsigned long long)mem->addr);
+	return snprintf(buf, PAGE_SIZE, "0x%llx\n", (unsigned long long)mem->addr);
 }
 
 static ssize_t map_size_show(struct uio_mem *mem, char *buf)
 {
-	return sprintf(buf, "0x%lx\n", mem->size);
+	return snprintf(buf, PAGE_SIZE, "0x%lx\n", mem->size);
 }
 
 static ssize_t map_offset_show(struct uio_mem *mem, char *buf)
 {
-	return sprintf(buf, "0x%llx\n", (unsigned long long)mem->addr & ~PAGE_MASK);
+	return snprintf(buf, PAGE_SIZE, "0x%llx\n", (unsigned long long)mem->addr & ~PAGE_MASK);
 }
 
 struct map_sysfs_entry {
@@ -89,7 +85,7 @@ static struct attribute *attrs[] = {
 	&addr_attribute.attr,
 	&size_attribute.attr,
 	&offset_attribute.attr,
-	NULL,	/* need to NULL terminate the list of attributes */
+	NULL,	
 };
 
 static void map_release(struct kobject *kobj)
@@ -134,17 +130,17 @@ static ssize_t portio_name_show(struct uio_port *port, char *buf)
 	if (unlikely(!port->name))
 		port->name = "";
 
-	return sprintf(buf, "%s\n", port->name);
+	return snprintf(buf, PAGE_SIZE, "%s\n", port->name);
 }
 
 static ssize_t portio_start_show(struct uio_port *port, char *buf)
 {
-	return sprintf(buf, "0x%lx\n", port->start);
+	return snprintf(buf, PAGE_SIZE, "0x%lx\n", port->start);
 }
 
 static ssize_t portio_size_show(struct uio_port *port, char *buf)
 {
-	return sprintf(buf, "0x%lx\n", port->size);
+	return snprintf(buf, PAGE_SIZE, "0x%lx\n", port->size);
 }
 
 static ssize_t portio_porttype_show(struct uio_port *port, char *buf)
@@ -154,7 +150,7 @@ static ssize_t portio_porttype_show(struct uio_port *port, char *buf)
 	if ((port->porttype < 0) || (port->porttype > UIO_PORT_OTHER))
 		return -EINVAL;
 
-	return sprintf(buf, "port_%s\n", porttypes[port->porttype]);
+	return snprintf(buf, PAGE_SIZE, "port_%s\n", porttypes[port->porttype]);
 }
 
 struct portio_sysfs_entry {
@@ -215,7 +211,7 @@ static ssize_t name_show(struct device *dev,
 			 struct device_attribute *attr, char *buf)
 {
 	struct uio_device *idev = dev_get_drvdata(dev);
-	return sprintf(buf, "%s\n", idev->info->name);
+	return snprintf(buf, PAGE_SIZE, "%s\n", idev->info->name);
 }
 static DEVICE_ATTR_RO(name);
 
@@ -223,7 +219,7 @@ static ssize_t version_show(struct device *dev,
 			    struct device_attribute *attr, char *buf)
 {
 	struct uio_device *idev = dev_get_drvdata(dev);
-	return sprintf(buf, "%s\n", idev->info->version);
+	return snprintf(buf, PAGE_SIZE, "%s\n", idev->info->version);
 }
 static DEVICE_ATTR_RO(version);
 
@@ -231,7 +227,7 @@ static ssize_t event_show(struct device *dev,
 			  struct device_attribute *attr, char *buf)
 {
 	struct uio_device *idev = dev_get_drvdata(dev);
-	return sprintf(buf, "%u\n", (unsigned int)atomic_read(&idev->event));
+	return snprintf(buf, PAGE_SIZE, "%u\n", (unsigned int)atomic_read(&idev->event));
 }
 static DEVICE_ATTR_RO(event);
 
@@ -243,15 +239,11 @@ static struct attribute *uio_attrs[] = {
 };
 ATTRIBUTE_GROUPS(uio);
 
-/* UIO class infrastructure */
 static struct class uio_class = {
 	.name = "uio",
 	.dev_groups = uio_groups,
 };
 
-/*
- * device functions
- */
 static int uio_dev_add_attributes(struct uio_device *idev)
 {
 	int ret;
@@ -385,10 +377,6 @@ static void uio_free_minor(struct uio_device *idev)
 	mutex_unlock(&minor_lock);
 }
 
-/**
- * uio_event_notify - trigger an interrupt event
- * @info: UIO device capabilities
- */
 void uio_event_notify(struct uio_info *info)
 {
 	struct uio_device *idev = info->uio_dev;
@@ -399,11 +387,6 @@ void uio_event_notify(struct uio_info *info)
 }
 EXPORT_SYMBOL_GPL(uio_event_notify);
 
-/**
- * uio_interrupt - hardware interrupt handler
- * @irq: IRQ number, can be UIO_IRQ_CYCLIC for cyclic timer
- * @dev_id: Pointer to the devices uio_device structure
- */
 static irqreturn_t uio_interrupt(int irq, void *dev_id)
 {
 	struct uio_device *idev = (struct uio_device *)dev_id;
@@ -599,10 +582,6 @@ static int uio_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	if (mi < 0)
 		return VM_FAULT_SIGBUS;
 
-	/*
-	 * We need to subtract mi because userspace uses offset = N*PAGE_SIZE
-	 * to use mem[N].
-	 */
 	offset = (vmf->pgoff - mi) << PAGE_SHIFT;
 
 	addr = (void *)(unsigned long)idev->info->mem[mi].addr + offset;
@@ -649,15 +628,6 @@ static int uio_mmap_physical(struct vm_area_struct *vma)
 	vma->vm_ops = &uio_physical_vm_ops;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	/*
-	 * We cannot use the vm_iomap_memory() helper here,
-	 * because vma->vm_pgoff is the map index we looked
-	 * up above in uio_find_mem_index(), rather than an
-	 * actual page offset into the mmap.
-	 *
-	 * So we just do the physical mmap without a page
-	 * offset.
-	 */
 	return remap_pfn_range(vma,
 			       vma->vm_start,
 			       mem->addr >> PAGE_SHIFT,
@@ -761,7 +731,7 @@ static int init_uio_class(void)
 {
 	int ret;
 
-	/* This is the first time in here, set everything up properly */
+	
 	ret = uio_major_init();
 	if (ret)
 		goto exit;
@@ -785,14 +755,6 @@ static void release_uio_class(void)
 	uio_major_cleanup();
 }
 
-/**
- * uio_register_device - register a new userspace IO device
- * @owner:	module that creates the new device
- * @parent:	parent device
- * @info:	UIO device capabilities
- *
- * returns zero on success or a negative error code.
- */
 int __uio_register_device(struct module *owner,
 			  struct device *parent,
 			  struct uio_info *info)
@@ -853,11 +815,6 @@ err_device_create:
 }
 EXPORT_SYMBOL_GPL(__uio_register_device);
 
-/**
- * uio_unregister_device - unregister a industrial IO device
- * @info:	UIO device capabilities
- *
- */
 void uio_unregister_device(struct uio_info *info)
 {
 	struct uio_device *idev;

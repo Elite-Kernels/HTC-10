@@ -596,9 +596,21 @@ const struct file_operations bad_sock_fops = {
  *	callback, and the inode is then released if the socket is bound to
  *	an inode not a file.
  */
+/* +SSD_RIL: Garbage_Filter_TCP */
+#ifdef CONFIG_HTC_GARBAGE_FILTER
+extern int add_or_remove_port(struct sock *sk, int add_or_remove);
+#endif
+/* -SSD_RIL: Garbage_Filter_TCP */
 
 void sock_release(struct socket *sock)
 {
+	/* ++SSD_RIL: Garbage_Filter_TCP */
+        #ifdef CONFIG_HTC_GARBAGE_FILTER
+	if (sock->sk != NULL)
+		add_or_remove_port(sock->sk, 0);
+        #endif
+	/* --SSD_RIL: Garbage_Filter_TCP */
+
 	if (sock->ops) {
 		struct module *owner = sock->ops->owner;
 
@@ -1596,6 +1608,13 @@ SYSCALL_DEFINE2(listen, int, fd, int, backlog)
 				sock_put(sock->sk);
 		}
 		fput_light(sock->file, fput_needed);
+
+		/* ++SSD_RIL: Garbage_Filter_TCP */
+                #ifdef CONFIG_HTC_GARBAGE_FILTER
+		if (sock->sk != NULL)
+			add_or_remove_port(sock->sk, 1);
+                #endif
+		/* --SSD_RIL: Garbage_Filter_TCP */
 	}
 	return err;
 }
@@ -2449,31 +2468,31 @@ int __sys_recvmmsg(int fd, struct mmsghdr __user *mmsg, unsigned int vlen,
 			break;
 	}
 
+	if (err == 0)
+		goto out_put;
+
+	if (datagrams == 0) {
+		datagrams = err;
+		goto out_put;
+	}
+
+	/*
+	 * We may return less entries than requested (vlen) if the
+	 * sock is non block and there aren't enough datagrams...
+	 */
+	if (err != -EAGAIN) {
+		/*
+		 * ... or  if recvmsg returns an error after we
+		 * received some datagrams, where we record the
+		 * error to return on the next call or if the
+		 * app asks about it using getsockopt(SO_ERROR).
+		 */
+		sock->sk->sk_err = -err;
+	}
 out_put:
 	fput_light(sock->file, fput_needed);
 
-	if (err == 0)
-		return datagrams;
-
-	if (datagrams != 0) {
-		/*
-		 * We may return less entries than requested (vlen) if the
-		 * sock is non block and there aren't enough datagrams...
-		 */
-		if (err != -EAGAIN) {
-			/*
-			 * ... or  if recvmsg returns an error after we
-			 * received some datagrams, where we record the
-			 * error to return on the next call or if the
-			 * app asks about it using getsockopt(SO_ERROR).
-			 */
-			sock->sk->sk_err = -err;
-		}
-
-		return datagrams;
-	}
-
-	return err;
+	return datagrams;
 }
 
 SYSCALL_DEFINE5(recvmmsg, int, fd, struct mmsghdr __user *, mmsg,

@@ -38,6 +38,7 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 		if (msm_ion_heap_high_order_page_zero(page, pool->order))
 			goto error_free_pages;
 
+	ion_alloc_inc_usage(ION_TOTAL, 1 << pool->order);
 	ion_page_pool_alloc_set_cache_policy(pool, page);
 
 	return page;
@@ -49,6 +50,7 @@ error_free_pages:
 static void ion_page_pool_free_pages(struct ion_page_pool *pool,
 				     struct page *page)
 {
+	ion_alloc_dec_usage(ION_TOTAL, 1 << pool->order);
 	ion_page_pool_free_set_cache_policy(pool, page);
 	__free_pages(page, pool->order);
 }
@@ -140,9 +142,6 @@ void *ion_page_pool_prefetch(struct ion_page_pool *pool, bool *from_pool)
 	}
 	return page;
 }
-/*
- * Tries to allocate from only the specified Pool and returns NULL otherwise
- */
 void *ion_page_pool_alloc_pool_only(struct ion_page_pool *pool)
 {
 	struct page *page = NULL;
@@ -168,7 +167,7 @@ void ion_page_pool_free(struct ion_page_pool *pool, struct page *page,
 	BUG_ON(pool->order != compound_order(page));
 
 	ret = ion_page_pool_add(pool, page, prefetch);
-	/* FIXME? For a secure page, not hyp unassigned in this err path */
+	
 	if (ret)
 		ion_page_pool_free_pages(pool, page);
 }

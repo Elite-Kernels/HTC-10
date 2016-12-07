@@ -11,6 +11,8 @@
 #include <linux/swap.h>
 #include <linux/vmstat.h>
 #include <linux/atomic.h>
+#include <linux/msm_ion.h>
+#include <linux/msm_kgsl.h>
 #include <linux/vmalloc.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -18,6 +20,37 @@
 
 void __attribute__((weak)) arch_report_meminfo(struct seq_file *m)
 {
+}
+
+static inline unsigned long free_cma_pages(void)
+{
+#ifdef CONFIG_CMA
+	return global_page_state(NR_FREE_CMA_PAGES);
+#else
+	return 0UL;
+#endif
+}
+
+void driver_report_meminfo(struct seq_file *m)
+{
+	unsigned long kgsl_alloc = kgsl_get_alloc_size(true);
+	uintptr_t ion_alloc = msm_ion_heap_meminfo(true);
+	uintptr_t ion_inuse = msm_ion_heap_meminfo(false);
+	unsigned long free_cma = free_cma_pages();
+
+#define K(x) ((x) << (PAGE_SHIFT - 10))
+
+	seq_printf(m,
+		"KgslAlloc:      %8lu kB\n"
+		"IonTotal:       %8lu kB\n"
+		"IonInUse:       %8lu kB\n"
+		"FreeCma:        %8lu kB\n",
+		(kgsl_alloc >> 10),
+		(ion_alloc >> 10),
+		(ion_inuse >> 10),
+		K(free_cma));
+
+#undef K
 }
 
 static int meminfo_proc_show(struct seq_file *m, void *v)
@@ -33,9 +66,6 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	struct zone *zone;
 	int lru;
 
-/*
- * display in kilobytes.
- */
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 	si_meminfo(&i);
 	si_swapinfo(&i);
@@ -54,37 +84,18 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	for_each_zone(zone)
 		wmark_low += zone->watermark[WMARK_LOW];
 
-	/*
-	 * Estimate the amount of memory available for userspace allocations,
-	 * without causing swapping.
-	 *
-	 * Free memory cannot be taken below the low watermark, before the
-	 * system starts swapping.
-	 */
 	available = i.freeram - wmark_low;
 
-	/*
-	 * Not all the page cache can be freed, otherwise the system will
-	 * start swapping. Assume at least half of the page cache, or the
-	 * low watermark worth of cache, needs to stay.
-	 */
 	pagecache = pages[LRU_ACTIVE_FILE] + pages[LRU_INACTIVE_FILE];
 	pagecache -= min(pagecache / 2, wmark_low);
 	available += pagecache;
 
-	/*
-	 * Part of the reclaimable slab consists of items that are in use,
-	 * and cannot be freed. Cap this estimate at the low watermark.
-	 */
 	available += global_page_state(NR_SLAB_RECLAIMABLE) -
 		     min(global_page_state(NR_SLAB_RECLAIMABLE) / 2, wmark_low);
 
 	if (available < 0)
 		available = 0;
 
-	/*
-	 * Tagged format, for easy grepping and expansion.
-	 */
 	seq_printf(m,
 		"MemTotal:       %8lu kB\n"
 		"MemFree:        %8lu kB\n"
@@ -198,6 +209,10 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	hugetlb_report_meminfo(m);
 
 	arch_report_meminfo(m);
+
+	driver_report_meminfo(m);
+
+	vm_event_report_meminfo(m);
 
 	return 0;
 #undef K

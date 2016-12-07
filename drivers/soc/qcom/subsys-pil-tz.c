@@ -25,6 +25,9 @@
 #include <linux/msm-bus-board.h>
 #include <linux/msm-bus.h>
 #include <linux/dma-mapping.h>
+#if defined(CONFIG_HTC_FEATURES_SSR)
+#include <linux/htc_flags.h>
+#endif
 
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/ramdump.h>
@@ -52,45 +55,12 @@
 #define desc_to_data(d) container_of(d, struct pil_tz_data, desc)
 #define subsys_to_data(d) container_of(d, struct pil_tz_data, subsys_desc)
 
-/**
- * struct reg_info - regulator info
- * @reg: regulator handle
- * @uV: voltage in uV
- * @uA: current in uA
- */
 struct reg_info {
 	struct regulator *reg;
 	int uV;
 	int uA;
 };
 
-/**
- * struct pil_tz_data
- * @regs: regulators that should be always on when the subsystem is
- *	   brought out of reset
- * @proxy_regs: regulators that should be on during pil proxy voting
- * @clks: clocks that should be always on when the subsystem is
- *	  brought out of reset
- * @proxy_clks: clocks that should be on during pil proxy voting
- * @reg_count: the number of always on regulators
- * @proxy_reg_count: the number of proxy voting regulators
- * @clk_count: the number of always on clocks
- * @proxy_clk_count: the number of proxy voting clocks
- * @smem_id: the smem id used for read the subsystem crash reason
- * @ramdump_dev: ramdump device pointer
- * @pas_id: the PAS id for tz
- * @bus_client: bus client id
- * @enable_bus_scaling: set to true if PIL needs to vote for
- *			bus bandwidth
- * @keep_proxy_regs_on: If set, during proxy unvoting, PIL removes the
- *			voltage/current vote for proxy regulators but leaves
- *			them enabled.
- * @stop_ack: state of completion of stop ack
- * @desc: PIL descriptor
- * @subsys: subsystem device pointer
- * @subsys_desc: subsystem descriptor
- * @u32 bits_arr[8]: array of bit positions in SCSR registers
- */
 struct pil_tz_data {
 	struct reg_info *regs;
 	struct reg_info *proxy_regs;
@@ -270,7 +240,7 @@ static int of_read_clocks(struct device *dev, struct clk ***clks_ref,
 			return rc;
 		}
 
-		/* Make sure rate-settable clocks' rates are set */
+		
 		if (clk_get_rate(clks[i]) == 0)
 			clk_set_rate(clks[i], clk_round_rate(clks[i],
 								clock_rate));
@@ -318,11 +288,6 @@ static int of_read_regs(struct device *dev, struct reg_info **regs_ref,
 			return rc;
 		}
 
-		/*
-		 * Read the voltage and current values for the corresponding
-		 * regulator. The device tree property name is "qcom," +
-		 *  "regulator_name" + "-uV-uA".
-		 */
 		rc = snprintf(reg_uV_uA_name, ARRAY_SIZE(reg_uV_uA_name),
 			 "qcom,%s-uV-uA", reg_name);
 		if (rc < strlen(reg_name) + 6) {
@@ -335,7 +300,7 @@ static int of_read_regs(struct device *dev, struct reg_info **regs_ref,
 
 		len /= sizeof(vdd_uV_uA[0]);
 
-		/* There should be two entries: one for uV and one for uA */
+		
 		if (len != 2) {
 			dev_err(dev, "Missing uV/uA value\n");
 			return -EINVAL;
@@ -800,6 +765,9 @@ static void log_failure_reason(const struct pil_tz_data *d)
 	strlcpy(reason, smem_reason, min(size, MAX_SSR_REASON_LEN));
 	pr_err("%s subsystem failure reason: %s.\n", name, reason);
 
+#if defined(CONFIG_HTC_DEBUG_SSR)
+	subsys_set_restart_reason(d->subsys, reason);
+#endif
 	smem_reason[0] = '\0';
 	wmb();
 }
@@ -886,9 +854,20 @@ static irqreturn_t subsys_err_fatal_intr_handler (int irq, void *dev_id)
 static irqreturn_t subsys_wdog_bite_irq_handler(int irq, void *dev_id)
 {
 	struct pil_tz_data *d = subsys_to_data(dev_id);
+#if defined(CONFIG_HTC_DEBUG_SSR)
+#define HTC_DEBUG_TZ_REASON_LEN 80
+	char tz_restart_reason[HTC_DEBUG_TZ_REASON_LEN];
+#endif
 
 	if (subsys_get_crash_status(d->subsys))
 		return IRQ_HANDLED;
+
+#if defined(CONFIG_HTC_DEBUG_SSR)
+	memset(tz_restart_reason, 0, sizeof(tz_restart_reason));
+	snprintf(tz_restart_reason, sizeof(tz_restart_reason)-1, "Watchdog bite received from %s",d->subsys_desc.name);
+	subsys_set_restart_reason(d->subsys, tz_restart_reason);
+#endif
+
 	pr_err("Watchdog bite received from %s!\n", d->subsys_desc.name);
 
 	if (d->subsys_desc.system_debug &&
@@ -919,7 +898,7 @@ static irqreturn_t subsys_generic_handler(int irq, void *dev_id)
 	if (subsys_get_crash_status(d->subsys))
 		return IRQ_HANDLED;
 
-	/* Masking interrupts not handled by HLOS */
+	
 	clear_val = __raw_readl(d->irq_mask);
 	__raw_writel(clear_val | BIT(d->bits_arr[COLD_BOOT_DONE]) |
 		BIT(d->bits_arr[GDSC_DONE]) | BIT(d->bits_arr[RAM_WIPE_DONE]) |
@@ -978,7 +957,7 @@ static int pil_tz_driver_probe(struct platform_device *pdev)
 	if (rc)
 		return rc;
 
-	/* Defaulting smem_id to be not present */
+	
 	d->smem_id = -1;
 
 	if (of_find_property(pdev->dev.of_node, "qcom,smem-id", &len)) {
@@ -1067,6 +1046,38 @@ static int pil_tz_driver_probe(struct platform_device *pdev)
 		rc = PTR_ERR(d->subsys);
 		goto err_subsys;
 	}
+
+#if defined(CONFIG_HTC_FEATURES_SSR)
+	if(!strcmp(d->desc.name, "adsp")) {
+#if defined(CONFIG_HTC_FEATURES_SSR_LPASS_ENABLE)
+		if (get_kernel_flag() & (KERNEL_FLAG_ENABLE_SSR_LPASS)) {
+			pr_info("%s: CONFIG_HTC_FEATURES_SSR_LPASS_ENABLE, KERNEL_FLAG_ENABLE_SSR_LPASS, RESET_SOC.\n", __func__);
+			subsys_set_restart_level(d->subsys, RESET_SOC);
+			subsys_set_enable_ramdump(d->subsys, DISABLE_RAMDUMP);
+		} else {
+			pr_info("%s: CONFIG_HTC_FEATURES_SSR_LPASS_ENABLE, RESET_SUBSYS_COUPLED.\n", __func__);
+			subsys_set_restart_level(d->subsys, RESET_SUBSYS_COUPLED);
+			if (get_radio_flag() & BIT(3))
+				subsys_set_enable_ramdump(d->subsys, ENABLE_RAMDUMP);
+			else
+				subsys_set_enable_ramdump(d->subsys, DISABLE_RAMDUMP);
+		}
+#else
+		if (get_kernel_flag() & (KERNEL_FLAG_ENABLE_SSR_LPASS)) {
+			pr_info("%s: KERNEL_FLAG_ENABLE_SSR_LPASS, RESET_SUBSYS_COUPLED.\n", __func__);
+			subsys_set_restart_level(d->subsys, RESET_SUBSYS_COUPLED);
+			if (get_radio_flag() & BIT(3))
+				subsys_set_enable_ramdump(d->subsys, ENABLE_RAMDUMP);
+			else
+				subsys_set_enable_ramdump(d->subsys, DISABLE_RAMDUMP);
+		} else {
+			pr_info("%s: RESET_SOC.\n", __func__);
+			subsys_set_restart_level(d->subsys, RESET_SOC);
+			subsys_set_enable_ramdump(d->subsys, DISABLE_RAMDUMP);
+		}
+#endif
+	}
+#endif
 
 	return 0;
 err_subsys:

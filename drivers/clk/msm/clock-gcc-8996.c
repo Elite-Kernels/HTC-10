@@ -3599,6 +3599,28 @@ static struct clk_lookup msm_clocks_gcc_8996_v2[] = {
 	CLK_LIST(gpll0_out_msscc),
 };
 
+void clk_gcc_ignore_list_add(const char *clock_name)
+{
+	struct clk_lookup *p, *cl = NULL;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(msm_clocks_gcc_8996); i++) {
+		p = &msm_clocks_gcc_8996[i];
+		if (p->clk && !strcmp(p->clk->dbg_name, clock_name)) {
+			cl = p;
+		}
+	}
+	if (cl)
+	cl->clk->flags |= CLKFLAG_IGNORE;
+}
+
+int __init clk_gcc_ignore_list_init(void)
+{
+	clk_gcc_ignore_list_add("gcc_blsp2_uart2_apps_clk");
+	return 0;
+}
+module_init(clk_gcc_ignore_list_init);
+
 static void msm_clocks_gcc_8996_v2_fixup(void)
 {
 	pcie_aux_clk_src.c.fmax[VDD_DIG_LOWER] = 9600000;
@@ -3640,7 +3662,7 @@ static int msm_gcc_8996_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	/* Set the HMSS_AHB_CLK_ENA bit to enable the hmss_ahb_clk */
+	
 	regval = readl_relaxed(virt_base + GCC_APCS_CLOCK_BRANCH_ENA_VOTE);
 	regval |= BIT(21);
 	writel_relaxed(regval, virt_base + GCC_APCS_CLOCK_BRANCH_ENA_VOTE);
@@ -3664,7 +3686,7 @@ static int msm_gcc_8996_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
-	/* Perform revision specific fixes */
+	
 	compat = of_get_property(pdev->dev.of_node, "compatible", &compatlen);
 	if (!compat || (compatlen <= 0))
 		return -EINVAL;
@@ -3678,7 +3700,7 @@ static int msm_gcc_8996_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	/* Register v2 specific clocks */
+	
 	if (is_v2) {
 		ret = of_msm_clock_register(pdev->dev.of_node,
 				msm_clocks_gcc_8996_v2,
@@ -3687,22 +3709,15 @@ static int msm_gcc_8996_probe(struct platform_device *pdev)
 			return ret;
 	}
 
-	/*
-	 * Hold an active set vote for the PNOC AHB source. Sleep set vote is 0.
-	 */
 	clk_set_rate(&pnoc_keepalive_a_clk.c, 19200000);
 	clk_prepare_enable(&pnoc_keepalive_a_clk.c);
 
-	/* This clock is used for all MMSS register access */
+	
 	clk_prepare_enable(&gcc_mmss_noc_cfg_ahb_clk.c);
 
-	/* Keep an active vote on CXO in case no other driver votes for it */
+	
 	clk_prepare_enable(&cxo_clk_src_ao.c);
 
-	/*
-	 * Keep the core memory settings enabled at all times for
-	 * gcc_mmss_bimc_gfx_clk.
-	 */
 	clk_set_flags(&gcc_mmss_bimc_gfx_clk.c, CLKFLAG_RETAIN_MEM);
 
 	dev_info(&pdev->dev, "Registered GCC clocks.\n");
@@ -3731,7 +3746,6 @@ int __init msm_gcc_8996_init(void)
 }
 arch_initcall(msm_gcc_8996_init);
 
-/* ======== Clock Debug Controller ======== */
 static struct clk_lookup msm_clocks_measure_8996[] = {
 	CLK_LIST(mmss_gcc_dbg_clk),
 	CLK_LIST(gpu_gcc_dbg_clk),
@@ -3783,7 +3797,7 @@ static int msm_clock_debug_8996_probe(struct platform_device *pdev)
 	gpu_gcc_dbg_clk.dev = &pdev->dev;
 	gpu_gcc_dbg_clk.clk_id = "debug_gpu_clk";
 
-	/* Perform revision specific fixes */
+	
 	compat = of_get_property(pdev->dev.of_node, "compatible", &compatlen);
 	if (!compat || (compatlen <= 0))
 		return -EINVAL;
@@ -3817,3 +3831,83 @@ int __init msm_clock_debug_8996_init(void)
 	return platform_driver_register(&msm_clock_debug_driver);
 }
 late_initcall(msm_clock_debug_8996_init);
+
+#ifdef CONFIG_HTC_POWER_DEBUG
+static LIST_HEAD(clk_blocked_list);
+static DEFINE_SPINLOCK(clk_blocked_lock);
+
+struct clk_table {
+        struct list_head node;
+        struct clk_lookup *clocks;
+        size_t num_clocks;
+};
+
+int clock_blocked_register(struct clk_lookup *table, size_t size)
+{
+        struct clk_table *clk_table;
+        unsigned long flags;
+
+        clk_table = kmalloc(sizeof(*clk_table), GFP_KERNEL);
+        if (!clk_table)
+                return -ENOMEM;
+
+        clk_table->clocks = table;
+        clk_table->num_clocks = size;
+
+        spin_lock_irqsave(&clk_blocked_lock, flags);
+        list_add_tail(&clk_table->node, &clk_blocked_list);
+        spin_unlock_irqrestore(&clk_blocked_lock, flags);
+
+        return 0;
+}
+
+int is_xo_src(struct clk *clk)
+{
+        if (clk == NULL)
+                return 0;
+        if (clk == &cxo_clk_src.c)
+                return 1;
+        else if (clk_get_parent(clk))
+                return is_xo_src(clk_get_parent(clk));
+        else
+                return 0;
+}
+
+static int clock_blocked_print_one(struct clk *c)
+{
+        if (!c || !c->prepare_count)
+                return 0;
+
+        if (is_xo_src(c)) {
+                if (c->vdd_class)
+                        pr_info("%s not off block xo vdig level %ld, parent clk: %s\n",
+                                c->dbg_name, c->vdd_class->cur_level,
+                                clk_get_parent(c)?clk_get_parent(c)->dbg_name:"none");
+                else
+                        pr_info("%s not off block xo vdig level (none), parent clk: %s\n",
+                                c->dbg_name,
+                                clk_get_parent(c)?clk_get_parent(c)->dbg_name:"none");
+
+                return 1;
+        }
+        return 0;
+}
+
+void clock_blocked_print(void)
+{
+        struct clk_table *table;
+        unsigned long flags;
+        int i, cnt = 0;
+
+        spin_lock_irqsave(&clk_blocked_lock, flags);
+        list_for_each_entry(table, &clk_blocked_list, node) {
+                for (i = 0; i < table->num_clocks; i++)
+                        cnt += clock_blocked_print_one(table->clocks[i].clk);
+        }
+        spin_unlock_irqrestore(&clk_blocked_lock, flags);
+
+        if (cnt)
+                pr_info("%d clks are on that block xo or vddmin\n", cnt);
+
+}
+#endif

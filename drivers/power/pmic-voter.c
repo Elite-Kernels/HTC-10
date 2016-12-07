@@ -163,7 +163,7 @@ int vote(struct votable *votable, int client_id, bool state, int val)
 	votable->votes[client_id].state = state;
 	votable->votes[client_id].value = val;
 
-	pr_debug("%s: %d voting for %d - %s\n",
+	pr_info("%s: %d voting for %d - %s\n",
 			votable->name,
 			client_id, val, state ? "on" : "off");
 	switch (votable->type) {
@@ -186,10 +186,6 @@ int vote(struct votable *votable, int client_id, bool state, int val)
 		goto out;
 	}
 
-	/*
-	 * If the votable does not have any votes it will maintain the last
-	 * known effective_result and effective_client_id
-	 */
 	if (effective_id < 0) {
 		pr_debug("%s: no votes; skipping callback\n", votable->name);
 		goto out;
@@ -200,7 +196,7 @@ int vote(struct votable *votable, int client_id, bool state, int val)
 	if (effective_result != votable->effective_result) {
 		votable->effective_client_id = effective_id;
 		votable->effective_result = effective_result;
-		pr_debug("%s: effective vote is now %d voted by %d\n",
+		pr_info("%s: effective vote is now %d voted by %d\n",
 				votable->name, effective_result, effective_id);
 		rc = votable->callback(votable->dev, effective_result,
 					effective_id, val, client_id);
@@ -252,10 +248,6 @@ struct votable *create_votable(struct device *dev, const char *name,
 	votable->default_result = default_result;
 	mutex_init(&votable->vote_lock);
 
-	/*
-	 * Because effective_result and client states are invalid
-	 * before the first vote, initialize them to -EINVAL
-	 */
 	votable->effective_result = -EINVAL;
 	votable->effective_client_id = -EINVAL;
 

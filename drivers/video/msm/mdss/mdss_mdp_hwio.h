@@ -16,12 +16,6 @@
 
 #include <linux/bitops.h>
 
-/*
- * struct mdss_mdp_hwio_cfg - used to define a register bitfield
- * @start: bitfield offset start from lsb
- * @len: number of lsb bits that can be taken from field value
- * @shift: number of lsb bits to truncate from field value
- */
 struct mdss_mdp_hwio_cfg {
 	u32 start, len, shift;
 };
@@ -38,7 +32,6 @@ static inline u32 mdss_mdp_hwio_mask(struct mdss_mdp_hwio_cfg *cfg, u32 val)
 #define ENHIST_LUT_ENTRIES 256
 #define HIST_V_SIZE	256
 
-/* QSEED3 LUT sizes */
 #define DIR_LUT_IDX		1
 #define DIR_LUT_COEFFS		200
 #define CIR_LUT_IDX		9
@@ -51,6 +44,8 @@ static inline u32 mdss_mdp_hwio_mask(struct mdss_mdp_hwio_cfg *cfg, u32 val)
 
 #define MDSS_REG_HW_VERSION				0x0
 #define MDSS_REG_HW_INTR_STATUS				0x10
+#define MDSS_REG_HW_INTR2_CLEAR				0x2C
+#define MDSS_REG_HW_INTR2_STATUS			0x0C
 
 #define MDSS_INTR_MDP				BIT(0)
 #define MDSS_INTR_DSI0				BIT(4)
@@ -176,7 +171,6 @@ enum mdss_mdp_ctl_index {
 #define MDSS_MDP_REG_CTL_LAYER_EXTN2_OFFSET		0x70
 #define MDSS_MDP_CTL_X_LAYER_5				0x24
 
-/* mixer 5 has different offset than others */
 #define MDSS_MDP_REG_CTL_LAYER(lm)	\
 	(((lm) == 5) ? MDSS_MDP_CTL_X_LAYER_5 : ((lm) * 0x004))
 
@@ -317,7 +311,6 @@ enum mdss_mdp_sspp_chroma_samp_type {
 #define MDSS_MDP_REG_VIG_MEM_COL_BASE			0x288
 #define MDSS_MDP_REG_VIG_PA_BASE			0x310
 
-/* QSEED3 registers shared by VIG and Destination Scaler */
 #define MDSS_MDP_REG_SCALER_HW_VERSION			0x00
 #define MDSS_MDP_REG_SCALER_OP_MODE			0x04
 #define MDSS_MDP_REG_SCALER_RGB2Y_COEFF			0x08
@@ -369,7 +362,6 @@ enum mdss_mdp_sspp_chroma_samp_type {
 #define Y_PRELOAD_V			8
 #define UV_PRELOAD_H			16
 #define UV_PRELOAD_V			24
-/* supported filters */
 #define EDGE_DIRECTED_2D		0x0
 #define CIRCULAR_2D			0x1
 #define SEPERABLE_1D			0x2
@@ -378,7 +370,6 @@ enum mdss_mdp_sspp_chroma_samp_type {
 #define ALPHA_BILINEAR			0x1
 
 
-/* in mpq product */
 #define MDSS_MDP_REG_VIG_FLUSH_SEL			0x204
 
 #define MDSS_MDP_VIG_OP_PA_SAT_ZERO_EXP_EN		BIT(2)
@@ -810,11 +801,9 @@ enum mdss_mdp_pingpong_index {
 
 #define MDSS_MDP_REG_CDM_HDMI_PACK_OP_MODE              0x200
 
-/* Following offsets are with respect to MDP base */
 #define MDSS_MDP_MDP_OUT_CTL_0                          0x410
 #define MDSS_MDP_INTF_CMD_MISR_CTRL		(MDSS_MDP_INTF_MISR_CTRL + 0x8)
 #define MDSS_MDP_INTF_CMD_MISR_SIGNATURE	(MDSS_MDP_INTF_MISR_CTRL + 0xC)
-/* following offsets are with respect to MDP VBIF base */
 #define MMSS_VBIF_CLKON			0x4
 #define MMSS_VBIF_RD_LIM_CONF			0x0B0
 #define MMSS_VBIF_WR_LIM_CONF			0x0C0

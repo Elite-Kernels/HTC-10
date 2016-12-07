@@ -417,6 +417,7 @@ header-y += serial_core.h
 header-y += serial_reg.h
 header-y += serio.h
 header-y += shm.h
+header-y += shub_ctrl.h
 header-y += signal.h
 header-y += signalfd.h
 header-y += smiapp.h
@@ -508,3 +509,5 @@ header-y += zorro.h
 header-y += zorro_ids.h
 header-y += android_pmem.h
 header-y += smcinvoke.h
+
+header-y += minifb.h

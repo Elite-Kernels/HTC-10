@@ -49,6 +49,8 @@
 #include <linux/suspend.h>
 #include <linux/uaccess.h>
 #include <linux/uio_driver.h>
+#include <linux/htc_flags.h>
+#include <linux/delay.h>
 
 #define CREATE_TRACE_POINTS
 #define TRACE_MSM_THERMAL
@@ -139,7 +141,7 @@ static int sensor_cnt;
 static int psm_rails_cnt;
 static int ocr_rail_cnt;
 static int limit_idx;
-static int limit_idx_low;
+static int limit_idx_low = 5;
 static int limit_idx_high;
 static int max_tsens_num;
 static struct cpufreq_frequency_table *table;
@@ -354,7 +356,6 @@ struct vdd_rstr_enable {
 	uint32_t enabled;
 };
 
-/* For SMPS only*/
 enum PMIC_SW_MODE {
 	PMIC_AUTO_MODE  = RPM_REGULATOR_MODE_AUTO,
 	PMIC_IPEAK_MODE = RPM_REGULATOR_MODE_IPEAK,
@@ -504,7 +505,7 @@ static void uio_init(struct platform_device *pdev)
 
 	mem_pyhsical = clnt_res->start;
 
-	/* Setup device */
+	
 	uio_reg_info->name = clnt_res->name;
 	uio_reg_info->version = UIO_VERSION;
 	uio_reg_info->mem[0].addr = mem_pyhsical;
@@ -1257,7 +1258,7 @@ static int get_device_tree_cluster_info(struct device *dev, int *cluster_id,
 	max_entry /= sizeof(__be32);
 
 	for (idx = 0; idx < max_entry; idx++, c_idx++) {
-		/* Read Cluster ID */
+		
 		ret = of_property_read_u32_index(dev->of_node, key, idx++,
 			&val);
 		if (ret) {
@@ -1265,7 +1266,7 @@ static int get_device_tree_cluster_info(struct device *dev, int *cluster_id,
 				ret);
 			return -EINVAL;
 		}
-		/* Read number of cores inside a cluster */
+		
 		cluster_id[c_idx] = val;
 		cpumask_clear(&cluster_cpus[c_idx]);
 		ret = of_property_read_u32_index(dev->of_node, key, idx,
@@ -1276,7 +1277,7 @@ static int get_device_tree_cluster_info(struct device *dev, int *cluster_id,
 			return -EINVAL;
 		}
 		core_cnt = val + idx;
-		/* map the cores to logical CPUs and get sibiling mask */
+		
 		for (; core_cnt != idx; core_cnt--) {
 			core_phandle = of_parse_phandle(dev->of_node, key,
 						core_cnt);
@@ -1313,12 +1314,6 @@ static int get_kernel_cluster_info(int *cluster_id, cpumask_t *cluster_cpus)
 			pr_err("CPU%d topology not initialized.\n", _cpu);
 			return -ENODEV;
 		}
-		/* Do not use the sibling cpumask from topology module.
-		** kernel topology module updates the sibling cpumask
-		** only when the cores are brought online for the first time.
-		** KTM figures out the sibling cpumask using the
-		** cluster and core ID mapping.
-		*/
 		for (cluster_index = 0; cluster_index < num_possible_cpus();
 			cluster_index++) {
 			if (cluster_id[cluster_index] == -1) {
@@ -1451,7 +1446,7 @@ static int get_cpu_freq_plan(int cpu,
 
 	rcu_read_lock();
 	while (!IS_ERR(opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq))) {
-		/* Convert from Hz to kHz */
+		
 		freq_table_ptr[table_len].frequency = freq / 1000;
 		pr_debug("cpu%d freq %d :%d\n", cpu, table_len,
 			freq_table_ptr[table_len].frequency);
@@ -1533,14 +1528,6 @@ static void update_cluster_freq(void)
 
 	for (; _cluster < core_ptr->entity_count; _cluster++, _cpu = 0,
 			online_cpu = -1, max = UINT_MAX, min = 0) {
-		/*
-		** If a cluster is synchronous, go over the frequency limits
-		** of each core in that cluster and aggregate the minimum
-		** and maximum frequencies. After aggregating, request for
-		** frequency update on the first online core in that cluster.
-		** Cpufreq driver takes care of updating the frequency of
-		** other cores in a synchronous cluster.
-		*/
 		cluster_ptr = &core_ptr->child_entity_ptr[_cluster];
 
 		if (!cluster_ptr->sync_cluster)
@@ -1602,9 +1589,23 @@ static void do_cluster_freq_ctrl(long temp)
 				, _cpu
 				, cluster_ptr->freq_table[freq_idx].frequency
 				, temp);
-			cpus[_cpu].limited_max_freq = min(
-				cluster_ptr->freq_table[freq_idx].frequency,
-				cpus[_cpu].vdd_max_freq);
+			if (freq_idx < limit_idx_low) {
+				cpus[_cpu].limited_max_freq = min(
+					cluster_ptr->freq_table[limit_idx_low].frequency,
+					cpus[_cpu].vdd_max_freq);
+				pr_info("Set _cpu%d max back to %u\n"
+					, _cpu
+					, cpus[_cpu].limited_max_freq);
+			}
+			else
+				cpus[_cpu].limited_max_freq =
+					cluster_ptr->freq_table[freq_idx].frequency;
+
+			cpus[_cpu].limited_min_freq =
+				cluster_ptr->freq_table[limit_idx_low].frequency;
+			pr_info("Set _cpu%d min to %u\n"
+				, _cpu
+				, cluster_ptr->freq_table[limit_idx_low].frequency);
 		}
 	}
 	if (_cpu != -1)
@@ -1612,7 +1613,6 @@ static void do_cluster_freq_ctrl(long temp)
 	put_online_cpus();
 }
 
-/* If freq table exists, then we can send freq request */
 static int check_freq_table(void)
 {
 	int ret = 0;
@@ -1689,7 +1689,7 @@ static int update_cpu_min_freq_all(struct rail *apss_rail, uint32_t min)
 		max_freq = apss_rail->max_frequency_limit;
 
 	get_online_cpus();
-	/* If min is larger than allowed max */
+	
 	if (core_ptr) {
 		for (; _cluster < core_ptr->entity_count; _cluster++) {
 			cluster_ptr = &core_ptr->child_entity_ptr[_cluster];
@@ -1769,7 +1769,7 @@ static int vdd_restriction_apply_freq(struct rail *r, int level)
 	if (level == r->curr_level)
 		return ret;
 
-	/* level = -1: disable, level = 0,1,2..n: enable */
+	
 	if (level == -1) {
 		ret = update_cpu_min_freq_all(r, r->min_level);
 		if (ret)
@@ -1802,7 +1802,7 @@ static int vdd_restriction_apply_voltage(struct rail *r, int level)
 	if (level == r->curr_level)
 		return ret;
 
-	/* level = -1: disable, level = 0,1,2..n: enable */
+	
 	if (level == -1) {
 		ret = regulator_set_voltage(r->reg, r->min_level,
 			INT_MAX);
@@ -1825,7 +1825,6 @@ static int vdd_restriction_apply_voltage(struct rail *r, int level)
 	return ret;
 }
 
-/* Setting all rails the same mode */
 static int psm_set_mode_all(int mode)
 {
 	int i = 0;
@@ -1886,10 +1885,6 @@ static ssize_t vdd_rstr_en_store(struct kobject *kobj,
 			ret = vdd_restriction_apply_voltage(&rails[i],
 			(val) ? 0 : -1);
 
-		/*
-		 * Even if fail to set one rail, still try to set the
-		 * others. Continue the loop
-		 */
 		if (ret)
 			pr_err("Set vdd restriction for %s failed\n",
 					rails[i].name);
@@ -1900,7 +1895,7 @@ static ssize_t vdd_rstr_en_store(struct kobject *kobj,
 				dis_cnt++;
 		}
 	}
-	/* As long as one rail is enabled, vdd rstr is enabled */
+	
 	if (val && en_cnt)
 		en->enabled = 1;
 	else if (!val && (dis_cnt == rails_cnt))
@@ -2037,7 +2032,7 @@ static ssize_t vdd_rstr_reg_value_show(
 {
 	int val = 0;
 	struct rail *reg = VDD_RSTR_REG_VALUE_FROM_ATTRIBS(attr);
-	/* -1:disabled, -2:fail to get regualtor handle */
+	
 	if (reg->curr_level < 0)
 		val = reg->curr_level;
 	else
@@ -2115,7 +2110,7 @@ static int request_optimum_current(struct psm_rail *rail, enum ocr_request req)
 		pr_err("Optimum current request failed. err:%d\n", ret);
 		goto request_ocr_exit;
 	}
-	ret = 0; /*regulator_set_optimum_mode returns the mode on success*/
+	ret = 0; 
 	pr_debug("Requested optimum current mode: %d\n", req);
 
 request_ocr_exit:
@@ -2373,7 +2368,7 @@ static int create_sensor_id_map(struct device *dev)
 
 	for (i = 0; i < max_tsens_num; i++) {
 		ret = tsens_get_hw_id_mapping(i, &tsens_id_map[i]);
-		/* If return -ENXIO, hw_id is default in sequence */
+		
 		if (ret) {
 			if (ret == -ENXIO) {
 				tsens_id_map[i] = i;
@@ -2392,7 +2387,6 @@ fail:
 	return ret;
 }
 
-/* 1:enable, 0:disable */
 static int vdd_restriction_apply_all(int en)
 {
 	int i = 0;
@@ -2424,16 +2418,12 @@ static int vdd_restriction_apply_all(int en)
 		}
 	}
 
-	/* As long as one rail is enabled, vdd rstr is enabled */
+	
 	if (en && en_cnt)
 		vdd_rstr_en.enabled = 1;
 	else if (!en && (dis_cnt == rails_cnt))
 		vdd_rstr_en.enabled = 0;
 
-	/*
-	 * Check fail_cnt again to make sure all of the rails are applied
-	 * restriction successfully or not
-	 */
 	if (fail_cnt)
 		return -EFAULT;
 	return ret;
@@ -2769,12 +2759,22 @@ static void therm_reset_notify(struct therm_threshold *thresh_data)
 
 	switch (thresh_data->trip_triggered) {
 	case THERMAL_TRIP_CONFIGURABLE_HI:
+		mdelay(50);
 		ret = therm_get_temp(thresh_data->sensor_id,
 				thresh_data->id_type, &temp);
-		if (ret)
+		if (ret) {
 			pr_err("Unable to read TSENS sensor:%d. err:%d\n",
 				thresh_data->sensor_id, ret);
-		msm_thermal_bite(thresh_data->sensor_id, temp);
+			break;
+		}
+		if (thresh_data->sensor_id < 0 || thresh_data->sensor_id > max_tsens_num) {
+			pr_err("unknown tsens id");
+			break;
+		}
+                if (temp >= msm_thermal_info.therm_reset_temp_degC)
+			msm_thermal_bite(thresh_data->sensor_id, temp);
+		else
+			 pr_err("msm_thermal ignore thermal reset");
 		break;
 	case THERMAL_TRIP_CONFIGURABLE_LOW:
 		break;
@@ -2841,17 +2841,11 @@ static void __ref do_core_control(long temp)
 			cpus_offlined &= ~BIT(i);
 			pr_info("Allow Online CPU%d Temp: %ld\n",
 					i, temp);
-			/*
-			 * If this core is already online, then bring up the
-			 * next offlined core.
-			 */
 			lock_device_hotplug();
 			if (cpu_online(i)) {
 				unlock_device_hotplug();
 				continue;
 			}
-			/* If this core wasn't previously online don't put it
-			   online */
 			if (!(cpumask_test_cpu(i, cpus_previously_online))) {
 				unlock_device_hotplug();
 				continue;
@@ -2870,7 +2864,6 @@ static void __ref do_core_control(long temp)
 	}
 	mutex_unlock(&core_control_mutex);
 }
-/* Call with core_control_mutex locked */
 static int __ref update_offline_cores(int val)
 {
 	uint32_t cpu = 0;
@@ -2912,8 +2905,6 @@ static int __ref update_offline_cores(int val)
 				unlock_device_hotplug();
 				continue;
 			}
-			/* If this core wasn't previously online don't put it
-			   online */
 			if (!(cpumask_test_cpu(cpu, cpus_previously_online))) {
 				unlock_device_hotplug();
 				continue;
@@ -2937,6 +2928,8 @@ static int __ref update_offline_cores(int val)
 			unlock_device_hotplug();
 		}
 	}
+
+	pr_info("cpus_offlined: %d\n", cpus_offlined);
 
 	if (pend_hotplug_req && !in_suspend && !retry_in_progress) {
 		retry_in_progress = true;
@@ -2990,8 +2983,10 @@ static __ref int do_hotplug(void *data)
 				mask |= BIT(cpu);
 			mutex_unlock(&devices->hotplug_dev->clnt_lock);
 		}
-		if (mask != cpus_offlined)
+		if (mask != cpus_offlined) {
 			update_offline_cores(mask);
+			pr_info("cpu mask updated: %d\n", mask);
+		}
 		mutex_unlock(&core_control_mutex);
 
 		if (devices && devices->hotplug_dev) {
@@ -3212,11 +3207,6 @@ static int do_ocr(void)
 
 	if (pfm_cnt == thresh[MSM_OCR].thresh_ct ||
 		ocr_rails[0].init != OPTIMUM_CURRENT_NR) {
-		/* 'init' not equal to OPTIMUM_CURRENT_NR means this is the
-		** first polling iteration after device probe. During first
-		** iteration, if temperature is less than the set point, clear
-		** the max current request made and reset the 'init'.
-		*/
 		if (ocr_rails[0].init != OPTIMUM_CURRENT_NR)
 			for (j = 0; j < ocr_rail_cnt; j++)
 				ocr_rails[j].init = OPTIMUM_CURRENT_NR;
@@ -3310,11 +3300,6 @@ static int do_psm(void)
 			continue;
 		}
 
-		/*
-		 * As long as one sensor is above the threshold, set PWM mode
-		 * on all rails, and loop stops. Set auto mode when all rails
-		 * are below thershold
-		 */
 		if (temp >  msm_thermal_info.psm_temp_degC) {
 			ret = psm_set_mode_all(PMIC_PWM_MODE);
 			if (ret) {
@@ -3341,6 +3326,14 @@ static int do_psm(void)
 exit:
 	mutex_unlock(&psm_mutex);
 	return ret;
+}
+
+static void lower_thermal_threshold(int threshold){
+	msm_thermal_info.limit_temp_degC-=threshold;
+	msm_thermal_info.core_limit_temp_degC-=threshold;
+	msm_thermal_info.hotplug_temp_degC-=threshold;
+	pr_info("limit temp = %d, core limit temp = %d, hotplug limit temp= %d\n",
+	msm_thermal_info.limit_temp_degC, msm_thermal_info.core_limit_temp_degC, msm_thermal_info.hotplug_temp_degC);
 }
 
 static void do_freq_control(long temp)
@@ -3370,7 +3363,7 @@ static void do_freq_control(long temp)
 			limit_idx = limit_idx_high;
 	}
 
-	/* Update new limits */
+	
 	get_online_cpus();
 	max_freq = table[limit_idx].frequency;
 	if (max_freq == cpus[cpu].limited_max_freq) {
@@ -3412,11 +3405,6 @@ static void check_temp(struct work_struct *work)
 	do_cx_phase_cond();
 	do_ocr();
 
-	/*
-	** All mitigation involving CPU frequency should be
-	** placed below this check. The mitigation following this
-	** frequency table check, should be able to handle the failure case.
-	*/
 	if (!freq_table_get)
 		check_freq_table();
 
@@ -3461,10 +3449,6 @@ static int __ref msm_thermal_cpu_callback(struct notifier_block *nfb,
 					cpu);
 				complete(&hotplug_notify_complete);
 			} else {
-				/*
-				 * This will be auto-corrected next time
-				 * do_core_control() is called
-				 */
 				pr_err("CPU%d online, after thermal veto\n",
 					cpu);
 			}
@@ -3509,7 +3493,6 @@ static int hotplug_notify(enum thermal_trip_type type, int temp, void *data)
 		pr_err("Hotplug task is not initialized\n");
 	return 0;
 }
-/* Adjust cpus offlined bit based on temperature reading. */
 static int hotplug_init_cpu_offlined(void)
 {
 	long temp = 0;
@@ -3586,10 +3569,6 @@ init_kthread:
 				PTR_ERR(hotplug_task));
 		return;
 	}
-	/*
-	 * Adjust cpus offlined bit when hotplug intitializes so that the new
-	 * cpus offlined state is based on hotplug threshold range
-	 */
 	if (hotplug_init_cpu_offlined())
 		kthread_stop(hotplug_task);
 }
@@ -3735,10 +3714,6 @@ static void freq_mitigation_init(void)
 		goto init_freq_thread;
 
 	for_each_possible_cpu(cpu) {
-		/*
-		 * Hotplug may not be enabled,
-		 * make sure core sensor id is initialized.
-		 */
 		cpus[cpu].sensor_id =
 			sensor_get_id((char *)cpus[cpu].sensor_type);
 		cpus[cpu].id_type = THERM_ZONE_ID;
@@ -4660,16 +4635,11 @@ cx_node_exit:
 	return ret;
 }
 
-/*
- * We will reset the cpu frequencies limits here. The core online/offline
- * status will be carried over to the process stopping the msm_thermal, as
- * we dont want to online a core and bring in the thermal issues.
- */
 static void __ref disable_msm_thermal(void)
 {
 	uint32_t cpu = 0;
 
-	/* make sure check_temp is no longer running */
+	
 	cancel_delayed_work_sync(&check_temp_work);
 
 	get_online_cpus();
@@ -4761,10 +4731,6 @@ static ssize_t __ref store_cc_enabled(struct kobject *kobj,
 		pr_info("Core control enabled\n");
 		cpus_previously_online_update();
 		register_cpu_notifier(&msm_thermal_cpu_notifier);
-		/*
-		 * Re-evaluate thermal core condition, update current status
-		 * and set threshold for all cpus.
-		 */
 		hotplug_init_cpu_offlined();
 		mutex_lock(&core_control_mutex);
 		update_offline_cores(cpus_offlined);
@@ -4815,6 +4781,8 @@ static ssize_t __ref store_cpus_offlined(struct kobject *kobj,
 		pr_err("Ignoring request; polling thread is enabled.\n");
 		goto done_cc;
 	}
+
+	pr_info("\"%s\"(PID:%i) request cpus offlined mask %d \n", current->comm, current->pid, val);
 
 	for_each_possible_cpu(cpu) {
 		if (!(msm_thermal_info.core_control_mask & BIT(cpu)))
@@ -5044,7 +5012,7 @@ static int devmgr_devices_init(struct platform_device *pdev)
 		goto device_exit;
 	}
 	if (num_possible_cpus() > 1) {
-		/* Add hotplug device */
+		
 		dev_mgr = devm_kzalloc(&pdev->dev,
 		sizeof(struct device_manager_data),
 			GFP_KERNEL);
@@ -5064,7 +5032,7 @@ static int devmgr_devices_init(struct platform_device *pdev)
 		list_add_tail(&dev_mgr->dev_ptr, &devices_list);
 		devices->hotplug_dev = dev_mgr;
 	}
-	/*  Add cpu devices */
+	
 	for_each_possible_cpu(cpu) {
 		dev_mgr = devm_kzalloc(&pdev->dev,
 		sizeof(struct device_manager_data),
@@ -5144,6 +5112,12 @@ int msm_thermal_init(struct msm_thermal_data *pdata)
 		return -EINVAL;
 	}
 
+	pr_info("limit temp = %d, core limit temp = %d, hotplug limit temp= %d\n",
+	msm_thermal_info.limit_temp_degC, msm_thermal_info.core_limit_temp_degC, msm_thermal_info.hotplug_temp_degC);
+
+	if(get_kernel_flag() & KERNEL_FLAG_KEEP_CHARG_ON)
+		lower_thermal_threshold(15);
+
 	enabled = 1;
 	polling_enabled = 1;
 	ret = cpufreq_register_notifier(&msm_thermal_cpufreq_notifier,
@@ -5172,8 +5146,6 @@ static int ocr_reg_init(struct platform_device *pdev)
 	int i, j;
 
 	for (i = 0; i < ocr_rail_cnt; i++) {
-		/* Check if vdd_restriction has already initialized any
-		 * regualtor handle. If so use the same handle.*/
 		for (j = 0; j < rails_cnt; j++) {
 			if (!strcmp(ocr_rails[i].name, rails[j].name)) {
 				if (rails[j].reg == NULL)
@@ -5211,10 +5183,6 @@ static int vdd_restriction_reg_init(struct platform_device *pdev)
 		if (rails[i].freq_req == 1) {
 			usefreq |= BIT(i);
 			check_freq_table();
-			/*
-			 * Restrict frequency by default until we have made
-			 * our first temp reading
-			 */
 			if (freq_table_get)
 				ret = vdd_restriction_apply_freq(&rails[i], 0);
 			else
@@ -5236,10 +5204,6 @@ static int vdd_restriction_reg_init(struct platform_device *pdev)
 					rails[i].name);
 				return ret;
 			}
-			/*
-			 * Restrict votlage by default until we have made
-			 * our first temp reading
-			 */
 			ret = vdd_restriction_apply_voltage(&rails[i], 0);
 		}
 	}
@@ -5268,7 +5232,7 @@ static int psm_reg_init(struct platform_device *pdev)
 					psm_rails[i].name);
 			return ret;
 		}
-		/* Apps default vote for PWM mode */
+		
 		psm_rails[i].init = PMIC_PWM_MODE;
 		ret = rpm_regulator_set_mode(psm_rails[i].reg,
 				psm_rails[i].init);
@@ -5792,9 +5756,6 @@ static int probe_vdd_mx(struct device_node *node,
 	if (ret)
 		goto read_node_done;
 
-	/*
-	 * Monitor only this sensor if defined, otherwise monitor all tsens
-	 */
 	key = "qcom,mx-restriction-sensor_id";
 	if (of_property_read_u32(node, key, &data->vdd_mx_sensor_id))
 		data->vdd_mx_sensor_id = MONITOR_ALL_TSENS;
@@ -6025,8 +5986,6 @@ static int create_alias_name(int _cpu, struct device_node *limits,
 				strlcpy((char *)sensors[sensor_idx].alias,
 					device_name, DEVM_NAME_MAX);
 				if (sensor_ct > 1) {
-					/* Multiple sensor monitoring
-					 * single device */
 					snprintf(cat_str, DEVM_NAME_MAX, "_%d",
 						idx);
 					strlcat((char *)
@@ -6034,7 +5993,7 @@ static int create_alias_name(int _cpu, struct device_node *limits,
 						cat_str, DEVM_NAME_MAX);
 				}
 			} else {
-				/* Single sensor monitoring multiple devices */
+				
 				snprintf(cat_str, DEVM_NAME_MAX,
 					"-"CPU_DEVICE, _cpu);
 				strlcat((char *)sensors[sensor_idx].alias,
@@ -6279,10 +6238,6 @@ static int probe_ocr(struct device_node *node, struct msm_thermal_data *data,
 	if (!ocr_reg_init_defer)
 		ocr_enabled = true;
 	ocr_nodes_called = false;
-	/*
-	 * Vote for max optimum current by default until we have made
-	 * our first temp reading
-	 */
 	if (ocr_enabled) {
 		ret = ocr_set_mode_all(OPTIMUM_CURRENT_MAX);
 		if (ret) {
@@ -7059,14 +7014,6 @@ static int msm_thermal_dev_probe(struct platform_device *pdev)
 	ret = probe_vdd_mx(node, &data, pdev);
 	if (ret == -EPROBE_DEFER)
 		goto fail;
-	/*
-	 * Probe optional properties below. Call probe_psm before
-	 * probe_vdd_rstr because rpm_regulator_get has to be called
-	 * before devm_regulator_get
-	 * probe_ocr should be called after probe_vdd_rstr to reuse the
-	 * regualtor handle. calling devm_regulator_get more than once
-	 * will fail.
-	 */
 	ret = probe_psm(node, &data, pdev);
 	if (ret == -EPROBE_DEFER)
 		goto fail;
@@ -7084,10 +7031,6 @@ static int msm_thermal_dev_probe(struct platform_device *pdev)
 		goto probe_exit;
 	}
 
-	/*
-	 * In case sysfs add nodes get called before probe function.
-	 * Need to make sure sysfs node is created again
-	 */
 	if (psm_nodes_called) {
 		msm_thermal_add_psm_nodes();
 		psm_nodes_called = false;
@@ -7196,6 +7139,13 @@ static int msm_thermal_dev_exit(struct platform_device *inp_dev)
 
 	return 0;
 }
+
+void set_ktm_freq_limit(uint32_t freq_limit)
+{
+	if (freq_limit > 0)
+		msm_thermal_info.freq_limit = freq_limit;
+}
+
 
 static int __init ktm_params(char *str)
 {

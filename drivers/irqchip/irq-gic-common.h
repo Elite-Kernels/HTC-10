@@ -21,6 +21,7 @@
 #include <linux/irqdomain.h>
 
 extern bool from_suspend;
+extern int msm_show_resume_irq_mask;
 extern struct irq_chip gic_arch_extn;
 extern int msm_show_resume_irq_mask;
 
@@ -30,4 +31,4 @@ void gic_dist_config(void __iomem *base, int gic_irqs,
 		     void (*sync_access)(void));
 void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
 
-#endif /* _IRQ_GIC_COMMON_H */
+#endif 

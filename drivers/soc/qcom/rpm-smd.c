@@ -43,7 +43,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/trace_rpm_smd.h>
 
-/* Debug Definitions */
 enum {
 	MSM_RPM_LOG_REQUEST_PRETTY	= BIT(0),
 	MSM_RPM_LOG_REQUEST_RAW		= BIT(1),
@@ -110,10 +109,9 @@ enum {
 };
 
 static const uint32_t msm_rpm_request_service[MSM_RPM_MSG_TYPE_NR] = {
-	0x716572, /* 'req\0' */
+	0x716572, 
 };
 
-/*the order of fields matter and reflect the order expected by the RPM*/
 struct rpm_request_header {
 	uint32_t service_type;
 	uint32_t request_len;
@@ -134,7 +132,7 @@ struct kvp {
 
 struct msm_rpm_kvp_data {
 	uint32_t key;
-	uint32_t nbytes; /* number of bytes */
+	uint32_t nbytes; 
 	uint8_t *value;
 	bool valid;
 };
@@ -340,9 +338,6 @@ struct msm_rpm_request {
 	uint32_t numbytes;
 };
 
-/*
- * Data related to message acknowledgment
- */
 
 LIST_HEAD(msm_rpm_wait_list);
 
@@ -436,7 +431,7 @@ int msm_rpm_smd_buffer_request(struct msm_rpm_request *cdata,
 		if (tr_insert(&tr_root, slp))
 			pr_err("Error updating sleep request\n");
 	} else {
-		/* handle unsent requests */
+		
 		tr_update(slp, buf);
 	}
 	trace_rpm_smd_sleep_set(cdata->msg_hdr.msg_id,
@@ -500,12 +495,6 @@ static int msm_rpm_glink_rx_poll(void *glink_handle)
 
 	ret = glink_rpm_rx_poll(glink_handle);
 	if (ret >= 0)
-		/*
-		 * Sleep for 50us at a time before checking
-		 * for packet availability. The 50us is based
-		 * on the the time rpm could take to process
-		 * and send an ack for the sleep set request.
-		 */
 		udelay(50);
 	else
 		pr_err("Not receieve an ACK from RPM. ret = %d\n", ret);
@@ -513,17 +502,10 @@ static int msm_rpm_glink_rx_poll(void *glink_handle)
 	return ret;
 }
 
-/*
- * Returns
- *	= 0 on successful reads
- *	> 0 on successful reads with no further data
- *	standard Linux error codes on failure.
- */
 static int msm_rpm_read_sleep_ack(void)
 {
 	int ret;
 	char buf[MAX_ERR_BUFFER_SIZE] = {0};
-	uint32_t msg_id;
 
 	if (glink_enabled)
 		ret = msm_rpm_glink_rx_poll(glink_data->glink_handle);
@@ -533,49 +515,19 @@ static int msm_rpm_read_sleep_ack(void)
 		while (timeout) {
 			if (smd_is_pkt_avail(msm_rpm_data.ch_info))
 				break;
-			/*
-			 * Sleep for 50us at a time before checking
-			 * for packet availability. The 50us is based
-			 * on the the max time rpm could take to process
-			 * and send an ack for sleep set request.
-			 */
 			udelay(50);
 			timeout--;
 		}
 
-		/*
-		 * On timeout return an error and exit the spinlock
-		 * control on this cpu. This will allow any other
-		 * core that has wokenup and trying to acquire the
-		 * spinlock from being locked out.
-		 */
 
 		if (!timeout)
 			return -EAGAIN;
 
 		ret = msm_rpm_read_smd_data(buf);
-		if (!ret) {
-			/* Mimic Glink behavior to ensure that the
-			 * data is read and the msg is removed from
-			 * the wait list. We should have gotten here
-			 * only when there are no drivers waiting on
-			 * ACKs. msm_rpm_get_entry_from_msg_id()
-			 * return non-NULL only then.
-			 */
-			msg_id = msm_rpm_get_msg_id_from_ack(buf);
-			msm_rpm_process_ack(msg_id, 0);
+		if (!ret)
 			ret = smd_is_pkt_avail(msm_rpm_data.ch_info);
-		}
 	}
 	return ret;
-}
-
-static void msm_rpm_flush_noack_messages(void)
-{
-	while (!list_empty(&msm_rpm_wait_list)) {
-		if (!msm_rpm_read_sleep_ack())
-			break;
-	}
 }
 
 static int msm_rpm_flush_requests(bool print)
@@ -583,8 +535,6 @@ static int msm_rpm_flush_requests(bool print)
 	struct rb_node *t;
 	int ret;
 	int count = 0;
-
-	msm_rpm_flush_noack_messages();
 
 	for (t = rb_first(&tr_root); t; t = rb_next(t)) {
 
@@ -613,13 +563,6 @@ static int msm_rpm_flush_requests(bool print)
 		s->valid = false;
 		count++;
 
-		/*
-		 * RPM acks need to be handled here if we have sent 24
-		 * messages such that we do not overrun SMD buffer. Since
-		 * we expect only sleep sets at this point (RPM PC would be
-		 * disallowed if we had pending active requests), we need not
-		 * process these sleep set acks.
-		 */
 		if (count >= MAX_WAIT_ON_ACK) {
 			int ret = msm_rpm_read_sleep_ack();
 
@@ -696,10 +639,6 @@ static int msm_rpm_add_kvp_data_common(struct msm_rpm_request *handle,
 			return -ENOMEM;
 		}
 	} else {
-		/* We enter the else case, if a key already exists but the
-		 * data doesn't match. In which case, we should zero the data
-		 * out.
-		 */
 		memset(handle->kvp[i].value, 0, data_size);
 	}
 
@@ -815,7 +754,6 @@ int msm_rpm_add_kvp_data_noirq(struct msm_rpm_request *handle,
 }
 EXPORT_SYMBOL(msm_rpm_add_kvp_data_noirq);
 
-/* Runs in interrupt context */
 static void msm_rpm_notify(void *data, unsigned event)
 {
 	struct msm_rpm_driver_data *pdata = (struct msm_rpm_driver_data *)data;
@@ -844,18 +782,14 @@ static void msm_rpm_notify(void *data, unsigned event)
 
 bool msm_rpm_waiting_for_ack(void)
 {
-	bool ret = false;
+	bool ret;
 	unsigned long flags;
-	struct msm_rpm_wait_data *elem = NULL;
 
 	spin_lock_irqsave(&msm_rpm_list_lock, flags);
-	elem = list_first_entry_or_null(&msm_rpm_wait_list,
-				struct msm_rpm_wait_data, list);
-	if (elem)
-		ret = !elem->delete_on_ack;
+	ret = list_empty(&msm_rpm_wait_list);
 	spin_unlock_irqrestore(&msm_rpm_list_lock, flags);
 
-	return ret;
+	return !ret;
 }
 
 static struct msm_rpm_wait_data *msm_rpm_get_entry_from_msg_id(uint32_t msg_id)
@@ -880,12 +814,6 @@ static uint32_t msm_rpm_get_next_msg_id(void)
 {
 	uint32_t id;
 
-	/*
-	 * A message id of 0 is used by the driver to indicate a error
-	 * condition. The RPM driver uses a id of 1 to indicate unsent data
-	 * when the data sent over hasn't been modified. This isn't a error
-	 * scenario and wait for ack returns a success when the message id is 1.
-	 */
 
 	do {
 		id = atomic_inc_return(&msm_rpm_msg_id);
@@ -950,10 +878,6 @@ static void msm_rpm_process_ack(uint32_t msg_id, int errno)
 		}
 		elem = NULL;
 	}
-	/* Special case where the sleep driver doesn't
-	 * wait for ACKs. This would decrease the latency involved with
-	 * entering RPM assisted power collapse.
-	 */
 	if (!elem)
 		trace_rpm_smd_ack_recvd(0, msg_id, 0xDEADBEEF);
 
@@ -1048,7 +972,7 @@ static void msm_rpm_log_request(struct msm_rpm_request *cdata)
 
 	if ((msm_rpm_debug_mask & MSM_RPM_LOG_REQUEST_PRETTY)
 	    && (msm_rpm_debug_mask & MSM_RPM_LOG_REQUEST_RAW)) {
-		/* Both pretty and raw formatting */
+		
 		memcpy(name, &cdata->msg_hdr.resource_type, sizeof(uint32_t));
 		pos += scnprintf(buf + pos, buflen - pos,
 			", rsc_type=0x%08X (%s), rsc_id=%u; ",
@@ -1092,7 +1016,7 @@ static void msm_rpm_log_request(struct msm_rpm_request *cdata)
 			prev_valid++;
 		}
 	} else if (msm_rpm_debug_mask & MSM_RPM_LOG_REQUEST_PRETTY) {
-		/* Pretty formatting only */
+		
 		memcpy(name, &cdata->msg_hdr.resource_type, sizeof(uint32_t));
 		pos += scnprintf(buf + pos, buflen - pos, " %s %u; ", name,
 				cdata->msg_hdr.resource_id);
@@ -1122,7 +1046,7 @@ static void msm_rpm_log_request(struct msm_rpm_request *cdata)
 			prev_valid++;
 		}
 	} else {
-		/* Raw formatting only */
+		
 		pos += scnprintf(buf + pos, buflen - pos,
 			", rsc_type=0x%08X, rsc_id=%u; ",
 			cdata->msg_hdr.resource_type,
@@ -1244,7 +1168,7 @@ static int msm_rpm_send_data(struct msm_rpm_request *cdata,
 	cdata->req_hdr.request_len = cdata->msg_hdr.data_len + msg_hdr_sz;
 	msg_size = cdata->req_hdr.request_len + req_hdr_sz;
 
-	/* populate data_len */
+	
 	if (msg_size > cdata->numbytes) {
 		kfree(cdata->buf);
 		cdata->numbytes = msg_size;
@@ -1261,7 +1185,7 @@ static int msm_rpm_send_data(struct msm_rpm_request *cdata,
 	tmpbuff += req_hdr_sz + msg_hdr_sz;
 
 	for (i = 0; (i < cdata->write_idx); i++) {
-		/* Sanity check */
+		
 		BUG_ON((tmpbuff - cdata->buf) > cdata->numbytes);
 
 		if (!cdata->kvp[i].valid)
@@ -1416,17 +1340,10 @@ static void msm_rpm_glink_read_data_noirq(struct msm_rpm_wait_data *elem)
 {
 	int ret;
 
-	/* Use rx_poll method to read the message from RPM */
+	
 	while (elem->errno) {
 		ret = glink_rpm_rx_poll(glink_data->glink_handle);
 		if (ret >= 0) {
-			/*
-			 * We might have receieve the notification.
-			 * Now we have to check whether the notification
-			 * received is what we are interested?
-			 * Wait for few usec to get the notification
-			 * before re-trying the poll again.
-			 */
 			udelay(50);
 		} else {
 			pr_err("rx poll return error = %d\n", ret);
@@ -1456,9 +1373,6 @@ int msm_rpm_wait_for_ack_noirq(uint32_t msg_id)
 	elem = msm_rpm_get_entry_from_msg_id(msg_id);
 
 	if (!elem)
-		/* Should this be a bug
-		 * Is it ok for another thread to read the msg?
-		 */
 		goto wait_ack_cleanup;
 
 	if (elem->errno != INIT_ERROR) {
@@ -1567,10 +1481,6 @@ bail:
 }
 EXPORT_SYMBOL(msm_rpm_send_message_noirq);
 
-/**
- * During power collapse, the rpm driver disables the SMD interrupts to make
- * sure that the interrupt doesn't wakes us from sleep.
- */
 int msm_rpm_enter_sleep(bool print, const struct cpumask *cpumask)
 {
 	int ret = 0;
@@ -1601,10 +1511,6 @@ int msm_rpm_enter_sleep(bool print, const struct cpumask *cpumask)
 }
 EXPORT_SYMBOL(msm_rpm_enter_sleep);
 
-/**
- * When the system resumes from power collapse, the SMD interrupt disabled by
- * enter function has to reenabled to continue processing SMD message.
- */
 void msm_rpm_exit_sleep(void)
 {
 	int ret;
@@ -1624,10 +1530,6 @@ void msm_rpm_exit_sleep(void)
 }
 EXPORT_SYMBOL(msm_rpm_exit_sleep);
 
-/*
- * Whenever there is a data from RPM, notify_rx will be called.
- * This function is invoked either interrupt OR polling context.
- */
 static void msm_rpm_trans_notify_rx(void *handle, const void *priv,
 			const void *pkt_priv, const void *ptr, size_t size)
 {
@@ -1649,12 +1551,6 @@ static void msm_rpm_trans_notify_rx(void *handle, const void *priv,
 	errno = msm_rpm_get_error_from_ack(buf);
 	elem = msm_rpm_get_entry_from_msg_id(msg_id);
 
-	/*
-	 * It is applicable for sleep set requests
-	 * Sleep set requests are not added to the
-	 * wait queue list. Without this check we
-	 * run into NULL pointer deferrence issue.
-	 */
 	if (!elem) {
 		spin_unlock_irqrestore(&rx_notify_lock, flags);
 		glink_rx_done(handle, ptr, 0);
@@ -1680,10 +1576,6 @@ static void msm_rpm_trans_notify_state(void *handle, const void *priv,
 			BUG_ON(1);
 		}
 
-		/*
-		 * Do not allow clients to send data to RPM until glink
-		 * is fully open.
-		 */
 		probe_status = 0;
 		pr_info("glink config params: transport=%s, edge=%s, name=%s\n",
 			glink_data->xprt,
@@ -1806,9 +1698,6 @@ static int msm_rpm_glink_link_setup(struct glink_apps_rpm_data *glink_data,
 
 	glink_data->link_info = link_info;
 
-	/*
-	 * Setup link info parameters
-	 */
 	link_info->edge = glink_data->edge;
 	link_info->glink_link_state_notif_cb =
 					msm_rpm_glink_notifier_cb;
@@ -1844,10 +1733,6 @@ static int msm_rpm_dev_glink_probe(struct platform_device *pdev)
 
 	ret = msm_rpm_glink_link_setup(glink_data, pdev);
 	if (ret < 0) {
-		/*
-		 * If the glink setup fails there is no
-		 * fall back mechanism to SMD.
-		 */
 		pr_err("GLINK setup fail ret = %d\n", ret);
 		BUG_ON(1);
 	}
@@ -1860,9 +1745,6 @@ static int msm_rpm_dev_probe(struct platform_device *pdev)
 	char *key = NULL;
 	int ret = 0;
 
-	/*
-	 * Check for standalone support
-	 */
 	key = "rpm-standalone";
 	standalone = of_property_read_bool(pdev->dev.of_node, key);
 	if (standalone) {

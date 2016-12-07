@@ -112,7 +112,7 @@ static struct dentry *proc_mount(struct file_system_type *fs_type,
 		ns = task_active_pid_ns(current);
 		options = data;
 
-		/* Does the mounter have privilege over the pid namespace? */
+		
 		if (!ns_capable(ns->user_ns, CAP_SYS_ADMIN))
 			return ERR_PTR(-EPERM);
 	}
@@ -120,6 +120,8 @@ static struct dentry *proc_mount(struct file_system_type *fs_type,
 	sb = sget(fs_type, proc_test_super, proc_set_super, flags, ns);
 	if (IS_ERR(sb))
 		return ERR_CAST(sb);
+
+	sb->s_stack_depth = FILESYSTEM_MAX_STACK_DEPTH;
 
 	if (!proc_parse_options(options, ns)) {
 		deactivate_locked_super(sb);
@@ -179,9 +181,9 @@ void __init proc_root_init(void)
 #endif
 	proc_mkdir("fs", NULL);
 	proc_mkdir("driver", NULL);
-	proc_mkdir("fs/nfsd", NULL); /* somewhere for the nfsd filesystem to be mounted */
+	proc_mkdir("fs/nfsd", NULL); 
 #if defined(CONFIG_SUN_OPENPROMFS) || defined(CONFIG_SUN_OPENPROMFS_MODULE)
-	/* just give it a mountpoint */
+	
 	proc_mkdir("openprom", NULL);
 #endif
 	proc_tty_init();
@@ -217,28 +219,17 @@ static int proc_root_readdir(struct file *file, struct dir_context *ctx)
 	return proc_pid_readdir(file, ctx);
 }
 
-/*
- * The root /proc directory is special, as it has the
- * <pid> directories. Thus we don't use the generic
- * directory handling functions for that..
- */
 static const struct file_operations proc_root_operations = {
 	.read		 = generic_read_dir,
 	.iterate	 = proc_root_readdir,
 	.llseek		= default_llseek,
 };
 
-/*
- * proc root can do almost nothing..
- */
 static const struct inode_operations proc_root_inode_operations = {
 	.lookup		= proc_root_lookup,
 	.getattr	= proc_root_getattr,
 };
 
-/*
- * This is the root "inode" in the /proc tree..
- */
 struct proc_dir_entry proc_root = {
 	.low_ino	= PROC_ROOT_INO, 
 	.namelen	= 5, 

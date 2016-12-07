@@ -30,6 +30,9 @@
 #include "diagfwd_socket.h"
 #include "diag_mux.h"
 #include "diag_ipc_logging.h"
+#include <linux/htc_flags.h>
+
+int diag_initialized;
 
 struct data_header {
 	uint8_t control_char;
@@ -133,7 +136,7 @@ static int diag_add_hdlc_encoding(unsigned char *dest_buf, int *dest_len,
 	while (total_processed < len) {
 		loop_count++;
 		header = (struct data_header *)temp_buf;
-		/* Perform initial error checking */
+		
 		if (header->control_char != CONTROL_CHAR ||
 		    header->version != 1) {
 			err = -EINVAL;
@@ -156,7 +159,7 @@ static int diag_add_hdlc_encoding(unsigned char *dest_buf, int *dest_len,
 			break;
 		}
 
-		/* Prepare for encoding the data */
+		
 		send.state = DIAG_STATE_START;
 		send.pkt = payload;
 		send.last = (void *)(payload + header->length - 1);
@@ -167,7 +170,7 @@ static int diag_add_hdlc_encoding(unsigned char *dest_buf, int *dest_len,
 		enc.crc = 0;
 		diag_hdlc_encode(&send, &enc);
 
-		/* Prepare for next packet */
+		
 		src_pkt_len = (header_size + header->length + 1);
 		total_processed += src_pkt_len;
 		temp_buf += src_pkt_len;
@@ -219,6 +222,9 @@ static void diagfwd_data_read_done(struct diagfwd_info *fwd_info,
 	int write_len = 0;
 	unsigned char *write_buf = NULL;
 	struct diagfwd_buf_t *temp_buf = NULL;
+#if DIAG_XPST && !defined(CONFIG_DIAGFWD_BRIDGE_CODE)
+	int ret = 0;
+#endif
 	struct diag_md_session_t *session_info = NULL;
 	uint8_t hdlc_disabled = 0;
 	if (!fwd_info || !buf || len <= 0) {
@@ -261,7 +267,7 @@ static void diagfwd_data_read_done(struct diagfwd_info *fwd_info,
 		}
 		write_len = len;
 	} else if (hdlc_disabled) {
-		/* The data is raw and and on APPS side HDLC is disabled */
+		
 		if (fwd_info->buf_1 && fwd_info->buf_1->data_raw == buf) {
 			temp_buf = fwd_info->buf_1;
 		} else if (fwd_info->buf_2 &&
@@ -305,6 +311,21 @@ static void diagfwd_data_read_done(struct diagfwd_info *fwd_info,
 			goto end;
 		}
 	}
+	if (fwd_info->peripheral == PERIPHERAL_MODEM) {
+		DIAGFWD_7K_RAWDATA(buf, "modem", DIAG_DBG_READ);
+#if DIAG_XPST && !defined(CONFIG_DIAGFWD_BRIDGE_CODE)
+		ret = checkcmd_modem_epst(buf);
+		if (ret) {
+			modem_to_userspace(buf, len, ret, 0);
+			
+			if (!(get_radio_ex2_flag() & 0x80000000))
+				goto end;
+			
+		}
+	
+	
+#endif
+	}
 
 	if (write_len > 0) {
 		err = diag_mux_write(DIAG_LOCAL_PROC, write_buf, write_len,
@@ -315,6 +336,7 @@ static void diagfwd_data_read_done(struct diagfwd_info *fwd_info,
 			goto end;
 		}
 	}
+
 	mutex_unlock(&fwd_info->data_mutex);
 	mutex_unlock(&driver->hdlc_disable_mutex);
 	diagfwd_queue_read(fwd_info);
@@ -349,13 +371,8 @@ static void diagfwd_cntl_read_done(struct diagfwd_info *fwd_info,
 
 	diag_ws_on_read(DIAG_WS_MUX, len);
 	diag_cntl_process_read_data(fwd_info, buf, len);
-	/*
-	 * Control packets are not consumed by the clients. Mimic
-	 * consumption by setting and clearing the wakeup source copy_count
-	 * explicitly.
-	 */
 	diag_ws_on_copy_fail(DIAG_WS_MUX);
-	/* Reset the buffer in_busy value after processing the data */
+	
 	if (fwd_info->buf_1)
 		atomic_set(&fwd_info->buf_1->in_busy, 0);
 
@@ -381,7 +398,7 @@ static void diagfwd_dci_read_done(struct diagfwd_info *fwd_info,
 	}
 
 	diag_dci_process_peripheral_data(fwd_info, (void *)buf, len);
-	/* Reset the buffer in_busy value after processing the data */
+	
 	if (fwd_info->buf_1)
 		atomic_set(&fwd_info->buf_1->in_busy, 0);
 
@@ -452,11 +469,6 @@ int diagfwd_peripheral_init(void)
 			fwd_info->write_bytes = 0;
 			mutex_init(&fwd_info->buf_mutex);
 			mutex_init(&fwd_info->data_mutex);
-			/*
-			 * This state shouldn't be set for Control channels
-			 * during initialization. This is set when the feature
-			 * mask is received for the first time.
-			 */
 			if (type != TYPE_CNTL)
 				fwd_info->inited = 1;
 		}
@@ -565,11 +577,6 @@ int diagfwd_register(uint8_t transport, uint8_t peripheral, uint8_t type,
 
 	if (atomic_read(&fwd_info->opened) &&
 	    fwd_info->p_ops && fwd_info->p_ops->open) {
-		/*
-		 * The registration can happen late, like in the case of
-		 * sockets. fwd_info->opened reflects diag_state. Propogate the
-		 * state to the peipherals.
-		 */
 		fwd_info->p_ops->open(fwd_info->ctxt);
 	}
 
@@ -683,7 +690,7 @@ int diagfwd_write(uint8_t peripheral, uint8_t type, void *buf, int len)
 	if (type == TYPE_CMD || type == TYPE_DCI_CMD) {
 		if (!driver->feature[peripheral].rcvd_feature_mask ||
 			!driver->feature[peripheral].sent_feature_mask) {
-			pr_debug_ratelimited("diag: In %s, feature mask for peripheral: %d not received or sent yet\n",
+			DIAGFWD_DBUG("diag: In %s, feature mask for peripheral: %d not received or sent yet\n",
 					     __func__, peripheral);
 			return 0;
 		}
@@ -782,10 +789,6 @@ void diagfwd_close(uint8_t peripheral, uint8_t type)
 
 	if (fwd_info->buf_1)
 		atomic_set(&fwd_info->buf_1->in_busy, 1);
-	/*
-	 * Only Data channels have two buffers. Set both the buffers
-	 * to busy on close.
-	 */
 	if (fwd_info->buf_2)
 		atomic_set(&fwd_info->buf_2->in_busy, 1);
 }
@@ -796,13 +799,13 @@ int diagfwd_channel_open(struct diagfwd_info *fwd_info)
 		return -EIO;
 
 	if (!fwd_info->inited) {
-		pr_debug("diag: In %s, channel is not inited, p: %d, t: %d\n",
+		DIAGFWD_DBUG("diag: In %s, channel is not inited, p: %d, t: %d\n",
 			 __func__, fwd_info->peripheral, fwd_info->type);
 		return -EINVAL;
 	}
 
 	if (fwd_info->ch_open) {
-		pr_debug("diag: In %s, channel is already open, p: %d, t: %d\n",
+		DIAGFWD_DBUG("diag: In %s, channel is already open, p: %d, t: %d\n",
 			 __func__, fwd_info->peripheral, fwd_info->type);
 		return 0;
 	}
@@ -819,6 +822,9 @@ int diagfwd_channel_open(struct diagfwd_info *fwd_info)
 		if (fwd_info->p_ops && fwd_info->p_ops->open)
 			fwd_info->p_ops->open(fwd_info->ctxt);
 	}
+
+	if (fwd_info->peripheral == PERIPHERAL_MODEM)
+		diag_initialized = 1;
 
 	return 0;
 }
@@ -840,6 +846,8 @@ int diagfwd_channel_close(struct diagfwd_info *fwd_info)
 	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "p: %d t: %d considered closed\n",
 		 fwd_info->peripheral, fwd_info->type);
 
+	if (fwd_info->peripheral == PERIPHERAL_MODEM)
+		diag_initialized = 0;
 	return 0;
 }
 
@@ -851,11 +859,6 @@ int diagfwd_channel_read_done(struct diagfwd_info *fwd_info,
 		return -EIO;
 	}
 
-	/*
-	 * Diag peripheral layers should send len as 0 if there is any error
-	 * in reading data from the transport. Use this information to reset the
-	 * in_busy flags. No need to queue read in this case.
-	 */
 	if (len == 0) {
 		diagfwd_reset_buffers(fwd_info, buf);
 		diag_ws_release();
@@ -900,7 +903,7 @@ void diagfwd_channel_read(struct diagfwd_info *fwd_info)
 	}
 
 	if (!fwd_info->inited || !atomic_read(&fwd_info->opened)) {
-		pr_debug("diag: In %s, p: %d, t: %d, inited: %d, opened: %d  ch_open: %d\n",
+		DIAGFWD_DBUG("diag: In %s, p: %d, t: %d, inited: %d, opened: %d  ch_open: %d\n",
 			 __func__, fwd_info->peripheral, fwd_info->type,
 			 fwd_info->inited, atomic_read(&fwd_info->opened),
 			 fwd_info->ch_open);
@@ -933,7 +936,7 @@ void diagfwd_channel_read(struct diagfwd_info *fwd_info)
 			read_len = fwd_info->buf_2->len;
 		}
 	} else {
-		pr_debug("diag: In %s, both buffers are empty for p: %d, t: %d\n",
+		DIAGFWD_DBUG("diag: In %s, both buffers are empty for p: %d, t: %d\n",
 			 __func__, fwd_info->peripheral, fwd_info->type);
 	}
 
@@ -965,18 +968,13 @@ static void diagfwd_queue_read(struct diagfwd_info *fwd_info)
 		return;
 
 	if (!fwd_info->inited || !atomic_read(&fwd_info->opened)) {
-		pr_debug("diag: In %s, p: %d, t: %d, inited: %d, opened: %d  ch_open: %d\n",
+		DIAGFWD_DBUG("diag: In %s, p: %d, t: %d, inited: %d, opened: %d  ch_open: %d\n",
 			 __func__, fwd_info->peripheral, fwd_info->type,
 			 fwd_info->inited, atomic_read(&fwd_info->opened),
 			 fwd_info->ch_open);
 		return;
 	}
 
-	/*
-	 * Don't queue a read on the data and command channels before receiving
-	 * the feature mask from the peripheral. We won't know which buffer to
-	 * use - HDLC or non HDLC buffer for reading.
-	 */
 	if ((!driver->feature[fwd_info->peripheral].rcvd_feature_mask) &&
 	    (fwd_info->type != TYPE_CNTL)) {
 		return;
@@ -1041,7 +1039,7 @@ void diagfwd_buffers_init(struct diagfwd_info *fwd_info)
 		}
 
 		if (driver->supports_apps_hdlc_encoding) {
-			/* In support of hdlc encoding */
+			
 			if (!fwd_info->buf_1->data_raw) {
 				fwd_info->buf_1->data_raw =
 					kzalloc(PERIPHERAL_BUF_SZ +
@@ -1066,7 +1064,7 @@ void diagfwd_buffers_init(struct diagfwd_info *fwd_info)
 	}
 
 	if (fwd_info->type == TYPE_CMD && driver->supports_apps_hdlc_encoding) {
-		/* In support of hdlc encoding */
+		
 		if (!fwd_info->buf_1->data_raw) {
 			fwd_info->buf_1->data_raw = kzalloc(PERIPHERAL_BUF_SZ +
 						APF_DIAG_PADDING,

@@ -28,6 +28,8 @@
 #define MB_SIZE_IN_PIXEL (16 * 16)
 #define MAX_OPERATING_FRAME_RATE (300 << 16)
 #define OPERATING_FRAME_RATE_STEP (1 << 16)
+#define SLAVE_SIDE_CP_ALIGNMENT 0x100000
+#define MASTER_SIDE_CP_ALIGNMENT 0x1000
 
 static const char *const mpeg_video_vidc_divx_format[] = {
 	"DIVX Format 3",
@@ -650,6 +652,20 @@ static u32 get_frame_size(struct msm_vidc_inst *inst,
 	return frame_size;
 }
 
+static u32 get_output_frame_size(struct msm_vidc_inst *inst,
+					const struct msm_vidc_format *fmt,
+					u32 height, u32 width, int plane)
+{
+	u32 frame_size = fmt->get_frame_size(plane,
+					height, width);
+	if (inst->flags & VIDC_SECURE) {
+		u32 alignment = inst->core->resources.slave_side_cp ?
+			SLAVE_SIDE_CP_ALIGNMENT : MASTER_SIDE_CP_ALIGNMENT;
+		frame_size = MSM_MEDIA_ALIGN(frame_size, alignment);
+	}
+	return frame_size;
+}
+
 static int is_ctrl_valid_for_codec(struct msm_vidc_inst *inst,
 					struct v4l2_ctrl *ctrl)
 {
@@ -1071,7 +1087,6 @@ int msm_vdec_g_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	struct hfi_device *hdev;
 	int rc = 0, i = 0, stride = 0, scanlines = 0, color_format = 0;
 	unsigned int *plane_sizes = NULL, extra_idx = 0;
-	struct hal_buffer_requirements *bufreq;
 
 	if (!inst || !f || !inst->core || !inst->core->device) {
 		dprintk(VIDC_ERR,
@@ -1093,10 +1108,6 @@ int msm_vdec_g_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		bool ds_enabled = msm_comm_g_ctrl_for_id(inst,
 			V4L2_CID_MPEG_VIDC_VIDEO_KEEP_ASPECT_RATIO);
 
-		/*
-		 * Do not update height and width on capture port, if
-		 * downscalar is explicitly enabled from v4l2 client.
-		 */
 		if (msm_comm_get_stream_output_mode(inst) ==
 			HAL_VIDEO_DECODER_SECONDARY && ds_enabled) {
 			inst->prop.height[OUTPUT_PORT] = inst->reconfig_height;
@@ -1156,15 +1167,15 @@ int msm_vdec_g_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 				inst->prop.height[CAPTURE_PORT]);
 
 		f->fmt.pix_mp.plane_fmt[0].sizeimage =
-			fmt->get_frame_size(0,
-			f->fmt.pix_mp.height, f->fmt.pix_mp.width);
+			get_output_frame_size(inst, fmt,
+			f->fmt.pix_mp.height, f->fmt.pix_mp.width, 0);
 
 		extra_idx = EXTRADATA_IDX(fmt->num_planes);
 		if (extra_idx && extra_idx < VIDEO_MAX_PLANES) {
-			bufreq = get_buff_req_buffer(inst,
-					HAL_BUFFER_EXTRADATA_OUTPUT);
 			f->fmt.pix_mp.plane_fmt[extra_idx].sizeimage =
-				bufreq ? bufreq->buffer_size : 0;
+				VENUS_EXTRADATA_SIZE(
+					inst->prop.height[CAPTURE_PORT],
+					inst->prop.width[CAPTURE_PORT]);
 		}
 
 		for (i = 0; i < fmt->num_planes; ++i)
@@ -1242,9 +1253,8 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	int ret = 0;
 	int i;
 	int max_input_size = 0;
-	struct hal_buffer_requirements *bufreq;
 
-	if (!inst || !f) {
+	if (!inst || !inst->core || !f) {
 		dprintk(VIDC_ERR, "%s invalid parameters\n", __func__);
 		return -EINVAL;
 	}
@@ -1288,20 +1298,16 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		}
 
 		f->fmt.pix_mp.plane_fmt[0].sizeimage =
-			fmt->get_frame_size(0,
-			f->fmt.pix_mp.height, f->fmt.pix_mp.width);
+			get_output_frame_size(inst, fmt,
+			f->fmt.pix_mp.height, f->fmt.pix_mp.width, 0);
 
 		extra_idx = EXTRADATA_IDX(fmt->num_planes);
 		if (extra_idx && extra_idx < VIDEO_MAX_PLANES) {
-			bufreq = get_buff_req_buffer(inst,
-					HAL_BUFFER_EXTRADATA_OUTPUT);
 			f->fmt.pix_mp.plane_fmt[extra_idx].sizeimage =
-				bufreq ? bufreq->buffer_size : 0;
+				VENUS_EXTRADATA_SIZE(
+					inst->prop.height[CAPTURE_PORT],
+					inst->prop.width[CAPTURE_PORT]);
 		}
-
-		for (i = 0; i < fmt->num_planes; ++i)
-			inst->bufq[CAPTURE_PORT].vb2_bufq.plane_sizes[i] =
-				f->fmt.pix_mp.plane_fmt[i].sizeimage;
 
 		f->fmt.pix_mp.num_planes = fmt->num_planes;
 		for (i = 0; i < fmt->num_planes; ++i) {
@@ -1526,13 +1532,6 @@ static int msm_vdec_queue_setup(struct vb2_queue *q,
 			break;
 		}
 
-		/* Pretend as if FW itself is asking for
-		 * additional buffers.
-		 * *num_buffers += MSM_VIDC_ADDITIONAL_BUFS_FOR_DCVS
-		 * is wrong since it will end up increasing the count
-		 * on every call to reqbufs if *num_bufs is larger
-		 * than min requirement.
-		 */
 		*num_buffers = max(*num_buffers, bufreq->buffer_count_min
 			+ msm_dcvs_get_extra_buff_count(inst));
 
@@ -1564,13 +1563,6 @@ static int msm_vdec_queue_setup(struct vb2_queue *q,
 				inst->buff_req.buffer[1].buffer_alignment);
 		sizes[0] = inst->bufq[CAPTURE_PORT].vb2_bufq.plane_sizes[0];
 
-		/*
-		 * Set actual buffer count to firmware for DPB buffers.
-		 * Firmware mandates setting of minimum buffer size
-		 * and actual buffer count for both OUTPUT and OUTPUT2.
-		 * Hence we are setting back the same buffer size
-		 * information back to firmware.
-		 */
 		if (msm_comm_get_stream_output_mode(inst) ==
 			HAL_VIDEO_DECODER_SECONDARY) {
 			bufreq = get_buff_req_buffer(inst,
@@ -1590,12 +1582,10 @@ static int msm_vdec_queue_setup(struct vb2_queue *q,
 		extra_idx =
 			EXTRADATA_IDX(inst->fmts[CAPTURE_PORT]->num_planes);
 		if (extra_idx && extra_idx < VIDEO_MAX_PLANES) {
-			bufreq = get_buff_req_buffer(inst,
-					HAL_BUFFER_EXTRADATA_OUTPUT);
-			if (bufreq)
-				sizes[extra_idx] = bufreq->buffer_size;
-			else
-				sizes[extra_idx] = 0;
+			sizes[extra_idx] =
+				VENUS_EXTRADATA_SIZE(
+					inst->prop.height[CAPTURE_PORT],
+					inst->prop.width[CAPTURE_PORT]);
 		}
 		break;
 	default:
@@ -1692,9 +1682,9 @@ static inline int start_streaming(struct msm_vidc_inst *inst)
 	struct msm_vidc_format *fmt = NULL;
 
 	fmt = inst->fmts[CAPTURE_PORT];
-	buffer_size = fmt->get_frame_size(0,
+	buffer_size = get_output_frame_size(inst, fmt,
 		inst->prop.height[CAPTURE_PORT],
-		inst->prop.width[CAPTURE_PORT]);
+		inst->prop.width[CAPTURE_PORT], 0);
 	hdev = inst->core->device;
 
 	if (msm_comm_get_stream_output_mode(inst) ==
@@ -1746,16 +1736,6 @@ static inline int start_streaming(struct msm_vidc_inst *inst)
 		}
 	}
 
-	/*
-	 * For seq_changed_insufficient, driver should set session_continue
-	 * to firmware after the following sequence
-	 * - driver raises insufficient event to v4l2 client
-	 * - all output buffers have been flushed and freed
-	 * - v4l2 client queries buffer requirements and splits/combines OPB-DPB
-	 * - v4l2 client sets new set of buffers to firmware
-	 * - v4l2 client issues CONTINUE to firmware to resume decoding of
-	 *   submitted ETBs.
-	 */
 	if (inst->in_reconfig) {
 		dprintk(VIDC_DBG, "send session_continue after reconfig\n");
 		rc = call_hfi_op(hdev, session_continue,
@@ -1960,11 +1940,6 @@ static int try_get_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 	}
 
 	hdev = inst->core->device;
-	/*
-	 * HACK: unlock the control prior to querying the hardware.  Otherwise
-	 * lower level code that attempts to do g_ctrl() will end up deadlocking
-	 * us.
-	 */
 	v4l2_ctrl_unlock(ctrl);
 
 	switch (ctrl->id) {
@@ -2024,8 +1999,6 @@ static int try_get_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		}
 		break;
 	default:
-		/* Other controls aren't really volatile, shouldn't need to
-		 * modify ctrl->value */
 		break;
 	}
 	v4l2_ctrl_lock(ctrl);
@@ -2036,7 +2009,7 @@ static int try_get_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 static int vdec_v4l2_to_hal(int id, int value)
 {
 	switch (id) {
-		/* H264 */
+		
 	case V4L2_CID_MPEG_VIDEO_H264_PROFILE:
 		switch (value) {
 		case V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE:
@@ -2106,7 +2079,7 @@ unknown_value:
 static int vdec_hal_to_v4l2(int id, int value)
 {
 	switch (id) {
-		/* H264 */
+		
 	case V4L2_CID_MPEG_VIDEO_H264_PROFILE:
 		switch (value) {
 		case HAL_H264_PROFILE_BASELINE:
@@ -2173,13 +2146,6 @@ static int vdec_hal_to_v4l2(int id, int value)
 	case V4L2_CID_MPEG_VIDEO_MPEG4_LEVEL:
 	case V4L2_CID_MPEG_VIDC_VIDEO_H263_LEVEL:
 	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_LEVEL:
-		/*
-		 * Extremely dirty hack: we haven't implemented g_ctrl of
-		 * any of these controls and have no intention of doing
-		 * so in the near future.  So just return 0 so that we
-		 * don't see the annoying "Unknown control" errors at the
-		 * bottom of this function.
-		 */
 		return 0;
 	}
 
@@ -2227,7 +2193,7 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 	if (rc)
 		return rc;
 
-	/* Small helper macro for quickly getting a control and err checking */
+	
 #define TRY_GET_CTRL(__ctrl_id) ({ \
 		struct v4l2_ctrl *__temp; \
 		__temp = get_ctrl_from_cluster( \
@@ -2236,8 +2202,8 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		if (!__temp) { \
 			dprintk(VIDC_ERR, "Can't find %s (%x) in cluster\n", \
 				#__ctrl_id, __ctrl_id); \
-			/* Clusters are hardcoded, if we can't find */ \
-			/* something then things are massively screwed up */ \
+			 \
+			 \
 			BUG_ON(1); \
 		} \
 		__temp; \
@@ -2517,9 +2483,6 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		break;
 	case V4L2_CID_MPEG_VIDC_VIDEO_PRIORITY:
 		property_id = HAL_CONFIG_REALTIME;
-		/* firmware has inverted values for realtime and
-		 * non-realtime priority
-		 */
 		hal_property.enable = !(ctrl->val);
 		pdata = &hal_property;
 		break;

@@ -11,10 +11,6 @@
  * GNU General Public License for more details.
  *
  */
-/*
- * SOC Info Routines
- *
- */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
@@ -56,7 +52,7 @@ enum {
 	HW_PLATFORM_MTP_MDM = 7,
 	HW_PLATFORM_MTP  = 8,
 	HW_PLATFORM_LIQUID  = 9,
-	/* Dragonboard platform id is assigned as 10 in CDT */
+	
 	HW_PLATFORM_DRAGON	= 10,
 	HW_PLATFORM_QRD	= 11,
 	HW_PLATFORM_HRD	= 13,
@@ -143,7 +139,6 @@ const char *hw_platform_subtype[] = {
 	[PLATFORM_SUBTYPE_INVALID] = "Invalid",
 };
 
-/* Used to parse shared memory.  Must match the modem. */
 struct socinfo_v0_1 {
 	uint32_t format;
 	uint32_t id;
@@ -205,6 +200,7 @@ struct socinfo_v0_11 {
 	struct socinfo_v0_10 v0_10;
 	uint32_t num_pmics;
 	uint32_t pmic_array_offset;
+	uint32_t apc0_cpu0_dbg_midr_el1;
 };
 
 struct socinfo_v0_12 {
@@ -229,12 +225,11 @@ static union {
 	struct socinfo_v0_12 v0_12;
 } *socinfo;
 
-/* max socinfo format version supported */
 #define MAX_SOCINFO_FORMAT SOCINFO_VERSION(0, 12)
 
 static struct msm_soc_info cpu_of_id[] = {
 
-	/* 7x01 IDs */
+	
 	[0]  = {MSM_CPU_UNKNOWN, "Unknown CPU"},
 	[1]  = {MSM_CPU_7X01, "MSM7X01"},
 	[16] = {MSM_CPU_7X01, "MSM7X01"},
@@ -249,7 +244,7 @@ static struct msm_soc_info cpu_of_id[] = {
 	[34] = {MSM_CPU_7X01, "MSM7X01"},
 	[35] = {MSM_CPU_7X01, "MSM7X01"},
 
-	/* 7x25 IDs */
+	
 	[20] = {MSM_CPU_7X25, "MSM7X25"},
 	[21] = {MSM_CPU_7X25, "MSM7X25"},
 	[24] = {MSM_CPU_7X25, "MSM7X25"},
@@ -263,7 +258,7 @@ static struct msm_soc_info cpu_of_id[] = {
 	[66] = {MSM_CPU_7X25, "MSM7X25"},
 
 
-	/* 7x27 IDs */
+	
 	[43] = {MSM_CPU_7X27, "MSM7X27"},
 	[44] = {MSM_CPU_7X27, "MSM7X27"},
 	[61] = {MSM_CPU_7X27, "MSM7X27"},
@@ -272,126 +267,126 @@ static struct msm_soc_info cpu_of_id[] = {
 	[69] = {MSM_CPU_7X27, "MSM7X27"},
 
 
-	/* 8x50 IDs */
+	
 	[30] = {MSM_CPU_8X50, "MSM8X50"},
 	[36] = {MSM_CPU_8X50, "MSM8X50"},
 	[37] = {MSM_CPU_8X50, "MSM8X50"},
 	[38] = {MSM_CPU_8X50, "MSM8X50"},
 
-	/* 7x30 IDs */
+	
 	[59] = {MSM_CPU_7X30, "MSM7X30"},
 	[60] = {MSM_CPU_7X30, "MSM7X30"},
 
-	/* 8x55 IDs */
+	
 	[74] = {MSM_CPU_8X55, "MSM8X55"},
 	[75] = {MSM_CPU_8X55, "MSM8X55"},
 	[85] = {MSM_CPU_8X55, "MSM8X55"},
 
-	/* 8x60 IDs */
+	
 	[70] = {MSM_CPU_8X60, "MSM8X60"},
 	[71] = {MSM_CPU_8X60, "MSM8X60"},
 	[86] = {MSM_CPU_8X60, "MSM8X60"},
 
-	/* 8960 IDs */
+	
 	[87] = {MSM_CPU_8960, "MSM8960"},
 
-	/* 7x25A IDs */
+	
 	[88] = {MSM_CPU_7X25A, "MSM7X25A"},
 	[89] = {MSM_CPU_7X25A, "MSM7X25A"},
 	[96] = {MSM_CPU_7X25A, "MSM7X25A"},
 
-	/* 7x27A IDs */
+	
 	[90] = {MSM_CPU_7X27A, "MSM7X27A"},
 	[91] = {MSM_CPU_7X27A, "MSM7X27A"},
 	[92] = {MSM_CPU_7X27A, "MSM7X27A"},
 	[97] = {MSM_CPU_7X27A, "MSM7X27A"},
 
-	/* FSM9xxx ID */
+	
 	[94] = {FSM_CPU_9XXX, "FSM9XXX"},
 	[95] = {FSM_CPU_9XXX, "FSM9XXX"},
 
-	/*  7x25AA ID */
+	
 	[98] = {MSM_CPU_7X25AA, "MSM7X25AA"},
 	[99] = {MSM_CPU_7X25AA, "MSM7X25AA"},
 	[100] = {MSM_CPU_7X25AA, "MSM7X25AA"},
 
-	/*  7x27AA ID */
+	
 	[101] = {MSM_CPU_7X27AA, "MSM7X27AA"},
 	[102] = {MSM_CPU_7X27AA, "MSM7X27AA"},
 	[103] = {MSM_CPU_7X27AA, "MSM7X27AA"},
 	[136] = {MSM_CPU_7X27AA, "MSM7X27AA"},
 
-	/* 9x15 ID */
+	
 	[104] = {MSM_CPU_9615, "MSM9615"},
 	[105] = {MSM_CPU_9615, "MSM9615"},
 	[106] = {MSM_CPU_9615, "MSM9615"},
 	[107] = {MSM_CPU_9615, "MSM9615"},
 	[171] = {MSM_CPU_9615, "MSM9615"},
 
-	/* 8064 IDs */
+	
 	[109] = {MSM_CPU_8064, "APQ8064"},
 
-	/* 8930 IDs */
+	
 	[116] = {MSM_CPU_8930, "MSM8930"},
 	[117] = {MSM_CPU_8930, "MSM8930"},
 	[118] = {MSM_CPU_8930, "MSM8930"},
 	[119] = {MSM_CPU_8930, "MSM8930"},
 	[179] = {MSM_CPU_8930, "MSM8930"},
 
-	/* 8627 IDs */
+	
 	[120] = {MSM_CPU_8627, "MSM8627"},
 	[121] = {MSM_CPU_8627, "MSM8627"},
 
-	/* 8660A ID */
+	
 	[122] = {MSM_CPU_8960, "MSM8960"},
 
-	/* 8260A ID */
+	
 	[123] = {MSM_CPU_8960, "MSM8960"},
 
-	/* 8060A ID */
+	
 	[124] = {MSM_CPU_8960, "MSM8960"},
 
-	/* 8974 IDs */
+	
 	[126] = {MSM_CPU_8974, "MSM8974"},
 	[184] = {MSM_CPU_8974, "MSM8974"},
 	[185] = {MSM_CPU_8974, "MSM8974"},
 	[186] = {MSM_CPU_8974, "MSM8974"},
 
-	/* 8974AA IDs */
+	
 	[208] = {MSM_CPU_8974PRO_AA, "MSM8974PRO-AA"},
 	[211] = {MSM_CPU_8974PRO_AA, "MSM8974PRO-AA"},
 	[214] = {MSM_CPU_8974PRO_AA, "MSM8974PRO-AA"},
 	[217] = {MSM_CPU_8974PRO_AA, "MSM8974PRO-AA"},
 
-	/* 8974AB IDs */
+	
 	[209] = {MSM_CPU_8974PRO_AB, "MSM8974PRO-AB"},
 	[212] = {MSM_CPU_8974PRO_AB, "MSM8974PRO-AB"},
 	[215] = {MSM_CPU_8974PRO_AB, "MSM8974PRO-AB"},
 	[218] = {MSM_CPU_8974PRO_AB, "MSM8974PRO-AB"},
 
-	/* 8974AC IDs */
+	
 	[194] = {MSM_CPU_8974PRO_AC, "MSM8974PRO-AC"},
 	[210] = {MSM_CPU_8974PRO_AC, "MSM8974PRO-AC"},
 	[213] = {MSM_CPU_8974PRO_AC, "MSM8974PRO-AC"},
 	[216] = {MSM_CPU_8974PRO_AC, "MSM8974PRO-AC"},
 
-	/* 8625 IDs */
+	
 	[127] = {MSM_CPU_8625, "MSM8625"},
 	[128] = {MSM_CPU_8625, "MSM8625"},
 	[129] = {MSM_CPU_8625, "MSM8625"},
 	[137] = {MSM_CPU_8625, "MSM8625"},
 	[167] = {MSM_CPU_8625, "MSM8625"},
 
-	/* 8064 MPQ ID */
+	
 	[130] = {MSM_CPU_8064, "APQ8064"},
 
-	/* 7x25AB IDs */
+	
 	[131] = {MSM_CPU_7X25AB, "MSM7X25AB"},
 	[132] = {MSM_CPU_7X25AB, "MSM7X25AB"},
 	[133] = {MSM_CPU_7X25AB, "MSM7X25AB"},
 	[135] = {MSM_CPU_7X25AB, "MSM7X25AB"},
 
-	/* 9625 IDs */
+	
 	[134] = {MSM_CPU_9625, "MSM9625"},
 	[148] = {MSM_CPU_9625, "MSM9625"},
 	[149] = {MSM_CPU_9625, "MSM9625"},
@@ -402,20 +397,20 @@ static struct msm_soc_info cpu_of_id[] = {
 	[174] = {MSM_CPU_9625, "MSM9625"},
 	[175] = {MSM_CPU_9625, "MSM9625"},
 
-	/* 8960AB IDs */
+	
 	[138] = {MSM_CPU_8960AB, "MSM8960AB"},
 	[139] = {MSM_CPU_8960AB, "MSM8960AB"},
 	[140] = {MSM_CPU_8960AB, "MSM8960AB"},
 	[141] = {MSM_CPU_8960AB, "MSM8960AB"},
 
-	/* 8930AA IDs */
+	
 	[142] = {MSM_CPU_8930AA, "MSM8930AA"},
 	[143] = {MSM_CPU_8930AA, "MSM8930AA"},
 	[144] = {MSM_CPU_8930AA, "MSM8930AA"},
 	[160] = {MSM_CPU_8930AA, "MSM8930AA"},
 	[180] = {MSM_CPU_8930AA, "MSM8930AA"},
 
-	/* 8226 IDs */
+	
 	[145] = {MSM_CPU_8226, "MSM8626"},
 	[158] = {MSM_CPU_8226, "MSM8226"},
 	[159] = {MSM_CPU_8226, "MSM8526"},
@@ -430,7 +425,7 @@ static struct msm_soc_info cpu_of_id[] = {
 	[223] = {MSM_CPU_8226, "MSM8628"},
 	[224] = {MSM_CPU_8226, "MSM8928"},
 
-	/* 8610 IDs */
+	
 	[147] = {MSM_CPU_8610, "MSM8610"},
 	[161] = {MSM_CPU_8610, "MSM8110"},
 	[162] = {MSM_CPU_8610, "MSM8210"},
@@ -441,28 +436,28 @@ static struct msm_soc_info cpu_of_id[] = {
 	[225] = {MSM_CPU_8610, "MSM8510"},
 	[226] = {MSM_CPU_8610, "MSM8512"},
 
-	/* 8064AB IDs */
+	
 	[153] = {MSM_CPU_8064AB, "APQ8064AB"},
 
-	/* 8930AB IDs */
+	
 	[154] = {MSM_CPU_8930AB, "MSM8930AB"},
 	[155] = {MSM_CPU_8930AB, "MSM8930AB"},
 	[156] = {MSM_CPU_8930AB, "MSM8930AB"},
 	[157] = {MSM_CPU_8930AB, "MSM8930AB"},
 	[181] = {MSM_CPU_8930AB, "MSM8930AB"},
 
-	/* 8625Q IDs */
+	
 	[168] = {MSM_CPU_8625Q, "MSM8225Q"},
 	[169] = {MSM_CPU_8625Q, "MSM8625Q"},
 	[170] = {MSM_CPU_8625Q, "MSM8125Q"},
 
-	/* 8064AA IDs */
+	
 	[172] = {MSM_CPU_8064AA, "APQ8064AA"},
 
-	/* 8084 IDs */
+	
 	[178] = {MSM_CPU_8084, "APQ8084"},
 
-	/* 9630 IDs */
+	
 	[187] = {MSM_CPU_9630, "MDM9630"},
 	[227] = {MSM_CPU_9630, "MDM9630"},
 	[228] = {MSM_CPU_9630, "MDM9630"},
@@ -470,7 +465,7 @@ static struct msm_soc_info cpu_of_id[] = {
 	[230] = {MSM_CPU_9630, "MDM9630"},
 	[231] = {MSM_CPU_9630, "MDM9630"},
 
-	/* FSM9900 ID */
+	
 	[188] = {FSM_CPU_9900, "FSM9900"},
 	[189] = {FSM_CPU_9900, "FSM9900"},
 	[190] = {FSM_CPU_9900, "FSM9900"},
@@ -478,24 +473,24 @@ static struct msm_soc_info cpu_of_id[] = {
 	[192] = {FSM_CPU_9900, "FSM9900"},
 	[193] = {FSM_CPU_9900, "FSM9900"},
 
-	/* 8916 IDs */
+	
 	[206] = {MSM_CPU_8916, "MSM8916"},
 	[247] = {MSM_CPU_8916, "APQ8016"},
 	[248] = {MSM_CPU_8916, "MSM8216"},
 	[249] = {MSM_CPU_8916, "MSM8116"},
 	[250] = {MSM_CPU_8916, "MSM8616"},
 
-	/* 8936 IDs */
+	
 	[233] = {MSM_CPU_8936, "MSM8936"},
 	[240] = {MSM_CPU_8936, "APQ8036"},
 	[242] = {MSM_CPU_8936, "MSM8236"},
 
-	/* 8939 IDs */
+	
 	[239] = {MSM_CPU_8939, "MSM8939"},
 	[241] = {MSM_CPU_8939, "APQ8039"},
 	[263] = {MSM_CPU_8939, "MSM8239"},
 
-	/* 8909 IDs */
+	
 	[245] = {MSM_CPU_8909, "MSM8909"},
 	[258] = {MSM_CPU_8909, "MSM8209"},
 	[259] = {MSM_CPU_8909, "MSM8208"},
@@ -506,31 +501,31 @@ static struct msm_soc_info cpu_of_id[] = {
 	[300] = {MSM_CPU_8909, "MSM8909W"},
 	[301] = {MSM_CPU_8909, "APQ8009W"},
 
-	/* ZIRC IDs */
+	
 	[234] = {MSM_CPU_ZIRC, "MSMZIRC"},
 	[235] = {MSM_CPU_ZIRC, "MSMZIRC"},
 	[236] = {MSM_CPU_ZIRC, "MSMZIRC"},
 	[237] = {MSM_CPU_ZIRC, "MSMZIRC"},
 	[238] = {MSM_CPU_ZIRC, "MSMZIRC"},
 
-	/* 8994 ID */
+	
 	[207] = {MSM_CPU_8994, "MSM8994"},
 	[253] = {MSM_CPU_8994, "APQ8094"},
 
-	/* 8992 ID */
+	
 	[251] = {MSM_CPU_8992, "MSM8992"},
 
-	/* FSM9010 ID */
+	
 	[254] = {FSM_CPU_9010, "FSM9010"},
 	[255] = {FSM_CPU_9010, "FSM9010"},
 	[256] = {FSM_CPU_9010, "FSM9010"},
 	[257] = {FSM_CPU_9010, "FSM9010"},
 
-	/* 8952 ID */
+	
 	[264] = {MSM_CPU_8952, "MSM8952"},
 	[289] = {MSM_CPU_8952, "APQ8952"},
 
-	/* 8996 IDs */
+	
 	[246] = {MSM_CPU_8996, "MSM8996"},
 	[291] = {MSM_CPU_8996, "APQ8096"},
 	[305] = {MSM_CPU_8996, "MSM8996pro"},
@@ -540,55 +535,52 @@ static struct msm_soc_info cpu_of_id[] = {
 	[315] = {MSM_CPU_8996, "MSM8996pro"},
 	[316] = {MSM_CPU_8996, "APQ8096pro"},
 
-	/* 8976 ID */
+	
 	[266] = {MSM_CPU_8976, "MSM8976"},
 
-	/* 8929 IDs */
+	
 	[268] = {MSM_CPU_8929, "MSM8929"},
 	[269] = {MSM_CPU_8929, "MSM8629"},
 	[270] = {MSM_CPU_8929, "MSM8229"},
 	[271] = {MSM_CPU_8929, "APQ8029"},
 
-	/* Cobalt ID */
+	
 	[292] = {MSM_CPU_COBALT, "MSMCOBALT"},
 
-	/* 8953 ID */
+	
 	[293] = {MSM_CPU_8953, "MSM8953"},
 	[304] = {MSM_CPU_8953, "APQ8053"},
 
-	/* 9607 IDs */
+	
 	[290] = {MSM_CPU_9607, "MDM9607"},
 	[296] = {MSM_CPU_9607, "MDM8207"},
 	[297] = {MSM_CPU_9607, "MDM9207"},
 	[298] = {MSM_CPU_9607, "MDM9307"},
 	[299] = {MSM_CPU_9607, "MDM9628"},
 
-	/* Californium IDs */
+	
 	[279] = {MSM_CPU_CALIFORNIUM, "MDMCALIFORNIUM"},
 	[283] = {MSM_CPU_CALIFORNIUM, "MDMCALIFORNIUM"},
 	[284] = {MSM_CPU_CALIFORNIUM, "MDMCALIFORNIUM"},
 	[285] = {MSM_CPU_CALIFORNIUM, "MDMCALIFORNIUM"},
 	[286] = {MSM_CPU_CALIFORNIUM, "MDMCALIFORNIUM"},
 
-	/*MSM8937 ID  */
+	
 	[294] = {MSM_CPU_8937, "MSM8937"},
 	[295] = {MSM_CPU_8937, "APQ8937"},
 
-	/* MSM8917 IDs */
+	
 	[303] = {MSM_CPU_8917, "MSM8917"},
 	[307] = {MSM_CPU_8917, "APQ8017"},
 	[308] = {MSM_CPU_8917, "MSM8217"},
 	[309] = {MSM_CPU_8917, "MSM8617"},
 
-	/* MSM8920 IDs */
+	
 	[320] = {MSM_CPU_8920, "MSM8920"},
 
-	/* MSM8940 IDs */
+	
 	[313] = {MSM_CPU_8940, "MSM8940"},
 
-	/* Uninitialized IDs are not known to run Linux.
-	   MSM_CPU_UNKNOWN is set to 0 to ensure these IDs are
-	   considered as unknown CPU. */
 };
 
 static enum msm_cpu cur_cpu;
@@ -614,6 +606,11 @@ static char *socinfo_get_id_string(void)
 uint32_t socinfo_get_version(void)
 {
 	return (socinfo) ? socinfo->v0_1.version : 0;
+}
+
+uint32_t socinfo_get_version_dbg(void)
+{
+	return (socinfo) ? socinfo->v0_11.apc0_cpu0_dbg_midr_el1 : 0;
 }
 
 char *socinfo_get_build_id(void)
@@ -678,8 +675,6 @@ uint32_t socinfo_get_platform_version(void)
 		: 0;
 }
 
-/* This information is directly encoded by the machine id */
-/* Thus no external callers rely on this information at the moment */
 static uint32_t socinfo_get_accessory_chip(void)
 {
 	return socinfo ?
@@ -1139,9 +1134,6 @@ static struct device_attribute msm_soc_attr_platform_subtype =
 	__ATTR(platform_subtype, S_IRUGO,
 			msm_get_platform_subtype, NULL);
 
-/* Platform Subtype String is being deprecated. Use Platform
- * Subtype ID instead.
- */
 static struct device_attribute msm_soc_attr_platform_subtype_id =
 	__ATTR(platform_subtype_id, S_IRUGO,
 			msm_get_platform_subtype_id, NULL);
@@ -1352,13 +1344,23 @@ static void __init populate_soc_sysfs_files(struct device *msm_soc_device)
 static void  __init soc_info_populate(struct soc_device_attribute *soc_dev_attr)
 {
 	uint32_t soc_version = socinfo_get_version();
+	uint32_t soc_version_dbg = socinfo_get_version_dbg();
 
 	soc_dev_attr->soc_id   = kasprintf(GFP_KERNEL, "%d", socinfo_get_id());
 	soc_dev_attr->family  =  "Snapdragon";
 	soc_dev_attr->machine  = socinfo_get_id_string();
-	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%u.%u",
-			SOCINFO_VERSION_MAJOR(soc_version),
-			SOCINFO_VERSION_MINOR(soc_version));
+	if(SOCINFO_VERSION_MAJOR(soc_version) > 2) {
+		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%u.%u(%u)",
+				SOCINFO_VERSION_MAJOR(soc_version),
+				SOCINFO_VERSION_MINOR(soc_version),
+				SOCINFO_VERSION_DBG(soc_version_dbg));
+	}
+	else {
+                soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%u.%u",
+                                SOCINFO_VERSION_MAJOR(soc_version),
+                                SOCINFO_VERSION_MINOR(soc_version));
+	}
+
 	return;
 
 }
