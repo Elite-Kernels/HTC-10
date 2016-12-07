@@ -444,7 +444,10 @@ static int hall_sensor_suspend(struct device *dev)
 		}
 		hl->irq_enable = 0;
 	}
-	HL_LOG("Hall enable: %d, irq_enable: %d",hl->hall_enable, hl->irq_enable);
+
+	if (!hl->hall_enable || hl->irq_enable)
+		HL_LOG("Hall enable: %d, irq_enable: %d",hl->hall_enable, hl->irq_enable);
+
 	return 0;
 }
 
@@ -461,7 +464,10 @@ static int hall_sensor_resume(struct device *dev)
 		}
 		hl->irq_enable = 1;
 	}
-	HL_LOG("Hall enable: %d, irq_enable: %d",hl->hall_enable, hl->irq_enable);
+
+	if (!hl->hall_enable || !hl->irq_enable)
+		HL_LOG("Hall enable: %d, irq_enable: %d",hl->hall_enable, hl->irq_enable);
+
 	return 0;
 }
 

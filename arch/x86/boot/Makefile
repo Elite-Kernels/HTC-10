@@ -18,6 +18,7 @@ OBJECT_FILES_NON_STANDARD	:= y
 # inconsistent state and crashed. We are interested mostly in syscall coverage,
 # so boot code is not interesting anyway.
 KCOV_INSTRUMENT		:= n
+KASAN_SANITIZE := n
 
 # If you want to preset the SVGA mode, uncomment the next line and
 # set SVGA_MODE to whatever number you want.
