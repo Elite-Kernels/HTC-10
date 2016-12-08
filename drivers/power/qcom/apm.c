@@ -79,7 +79,7 @@
 
 #define MSM_APM_DRIVER_NAME        "qcom,msm-apm"
 
-#define __invoke_psci_fn_smc(a, b, c, d) 0
+asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
 
 enum {
 	CLOCK_ASSERT_ENABLE,

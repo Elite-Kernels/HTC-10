@@ -368,8 +368,8 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	raw_spin_unlock(&irq_controller_lock);
 
 	for (i = find_first_bit((unsigned long *)pending, gic->irq_nr);
-	        i < gic->irq_nr;
-	        i = find_next_bit((unsigned long *)pending, gic->irq_nr, i+1)) {
+	     i < gic->irq_nr;
+	     i = find_next_bit((unsigned long *)pending, gic->irq_nr, i+1)) {
 		unsigned int irq = irq_find_mapping(gic->domain, i);
 		struct irq_desc *desc = irq_to_desc(irq);
 		const char *name = "null";

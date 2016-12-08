@@ -16,8 +16,7 @@ struct alt_instr {
 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
 };
 
-void apply_alternatives_all(void);
-void apply_alternatives(void *start, size_t length);
+void apply_alternatives(void);
 void free_alternatives_memory(void);
 
 #define ALTINSTR_ENTRY(feature)						      \
