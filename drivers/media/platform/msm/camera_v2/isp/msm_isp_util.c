@@ -1739,9 +1739,10 @@ static inline void msm_isp_update_error_info(struct vfe_device *vfe_dev,
 	vfe_dev->error_info.error_count++;
 }
 
-static void msm_isp_process_overflow_irq(
+void msm_isp_process_overflow_irq(
 	struct vfe_device *vfe_dev,
-	uint32_t *irq_status0, uint32_t *irq_status1)
+	uint32_t *irq_status0, uint32_t *irq_status1,
+	uint32_t force_overflow)
 {
 	uint32_t overflow_mask;
 
@@ -1764,11 +1765,13 @@ static void msm_isp_process_overflow_irq(
 	/*Check if any overflow bit is set*/
 	vfe_dev->hw_info->vfe_ops.core_ops.
 		get_overflow_mask(&overflow_mask);
-	overflow_mask &= *irq_status1;
+	if (!force_overflow)
+		overflow_mask &= *irq_status1;
 
 	if (overflow_mask) {
 		struct msm_isp_event_data error_event;
 
+                pr_err("%s: overflow_mask:0x%x\n", __func__, overflow_mask);
 		if (vfe_dev->reset_pending == 1) {
 			pr_err("%s:%d failed: overflow %x during reset\n",
 				__func__, __LINE__, overflow_mask);
@@ -1783,15 +1786,27 @@ static void msm_isp_process_overflow_irq(
 		/* maks off irq for current vfe */
 		atomic_cmpxchg(&vfe_dev->error_info.overflow_state,
 			NO_OVERFLOW, OVERFLOW_DETECTED);
+		vfe_dev->recovery_irq0_mask = vfe_dev->irq0_mask;
+		vfe_dev->recovery_irq1_mask = vfe_dev->irq1_mask;
+
 		vfe_dev->hw_info->vfe_ops.core_ops.
 			set_halt_restart_mask(vfe_dev);
 
 		/* mask off other vfe if dual vfe is used */
 		if (vfe_dev->is_split) {
 			uint32_t other_vfe_id;
+			struct vfe_device *other_vfe_dev;
 
 			other_vfe_id = (vfe_dev->pdev->id == ISP_VFE0) ?
 				ISP_VFE1 : ISP_VFE0;
+			other_vfe_dev = vfe_dev->common_data->
+				dual_vfe_res->vfe_dev[other_vfe_id];
+			if (other_vfe_dev) {
+			  other_vfe_dev->recovery_irq0_mask =
+				  other_vfe_dev->irq0_mask;
+			  other_vfe_dev->recovery_irq1_mask =
+				  other_vfe_dev->irq1_mask;
+			}
 
 			atomic_cmpxchg(&(vfe_dev->common_data->dual_vfe_res->
 				vfe_dev[other_vfe_id]->
@@ -1877,7 +1892,7 @@ irqreturn_t msm_isp_process_irq(int irq_num, void *data)
 	ping_pong_status = vfe_dev->hw_info->vfe_ops.axi_ops.
 		get_pingpong_status(vfe_dev);
 	msm_isp_process_overflow_irq(vfe_dev,
-		&irq_status0, &irq_status1);
+		&irq_status0, &irq_status1, 0);
 
 	vfe_dev->hw_info->vfe_ops.core_ops.
 		get_error_mask(&error_mask0, &error_mask1);
@@ -1942,8 +1957,8 @@ void msm_isp_do_tasklet(unsigned long data)
 			irq_status0, irq_status1);
 		if (atomic_read(&vfe_dev->error_info.overflow_state)
 			!= NO_OVERFLOW) {
-			ISP_DBG("%s: Recovery in processing, Ignore IRQs!!!\n",
-				__func__);
+                        pr_err("%s: overflow_state:%d, Recovery in processing, Ignore IRQs!!!\n",
+                                __func__, atomic_read(&vfe_dev->error_info.overflow_state));
 			continue;
 		}
 		msm_isp_process_error_info(vfe_dev);

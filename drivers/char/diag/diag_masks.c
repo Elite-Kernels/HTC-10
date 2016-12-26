@@ -27,6 +27,7 @@
 
 #define DIAG_SET_FEATURE_MASK(x) (feature_bytes[(x)/8] |= (1 << (x & 0x7)))
 
+extern int diag_rb_enable;
 #define diag_check_update(x)	\
 	(!info || (info && (info->peripheral_mask & MD_PERIPHERAL_MASK(x)))) \
 
@@ -101,7 +102,7 @@ static void diag_send_log_mask_update(uint8_t peripheral, int equip_id)
 
 	if (!driver->diagfwd_cntl[peripheral] ||
 	    !driver->diagfwd_cntl[peripheral]->ch_open) {
-		pr_debug("diag: In %s, control channel is not open, p: %d\n",
+		DIAG_DBUG("diag: In %s, control channel is not open, p: %d\n",
 			 __func__, peripheral);
 		return;
 	}
@@ -135,7 +136,7 @@ static void diag_send_log_mask_update(uint8_t peripheral, int equip_id)
 		send_once = 0;
 		break;
 	default:
-		pr_debug("diag: In %s, invalid log_mask status\n", __func__);
+		DIAG_DBUG("diag: In %s, invalid log_mask status\n", __func__);
 		return;
 	}
 
@@ -203,7 +204,7 @@ static void diag_send_event_mask_update(uint8_t peripheral)
 	int temp_len = 0;
 
 	if (num_bytes <= 0 || num_bytes > driver->event_mask_size) {
-		pr_debug("diag: In %s, invalid event mask length %d\n",
+		DIAG_DBUG("diag: In %s, invalid event mask length %d\n",
 			 __func__, num_bytes);
 		return;
 	}
@@ -213,7 +214,7 @@ static void diag_send_event_mask_update(uint8_t peripheral)
 
 	if (!driver->diagfwd_cntl[peripheral] ||
 	    !driver->diagfwd_cntl[peripheral]->ch_open) {
-		pr_debug("diag: In %s, control channel is not open, p: %d\n",
+		DIAG_DBUG("diag: In %s, control channel is not open, p: %d\n",
 			 __func__, peripheral);
 		return;
 	}
@@ -260,7 +261,7 @@ static void diag_send_event_mask_update(uint8_t peripheral)
 		write_len += num_bytes;
 		break;
 	default:
-		pr_debug("diag: In %s, invalid status %d\n", __func__,
+		DIAG_DBUG("diag: In %s, invalid status %d\n", __func__,
 			 mask_info->status);
 		goto err;
 	}
@@ -294,7 +295,7 @@ static void diag_send_msg_mask_update(uint8_t peripheral, int first, int last)
 
 	if (!driver->diagfwd_cntl[peripheral] ||
 	    !driver->diagfwd_cntl[peripheral]->ch_open) {
-		pr_debug("diag: In %s, control channel is not open, p: %d\n",
+		DIAG_DBUG("diag: In %s, control channel is not open, p: %d\n",
 			 __func__, peripheral);
 		return;
 	}
@@ -321,7 +322,7 @@ static void diag_send_msg_mask_update(uint8_t peripheral, int first, int last)
 	case DIAG_CTRL_MASK_VALID:
 		break;
 	default:
-		pr_debug("diag: In %s, invalid status: %d\n", __func__,
+		DIAG_DBUG("diag: In %s, invalid status: %d\n", __func__,
 			 mask_info->status);
 		goto err;
 	}
@@ -349,7 +350,7 @@ static void diag_send_msg_mask_update(uint8_t peripheral, int first, int last)
 			} else {
 				mask_info->update_buf = temp;
 				mask_info->update_buf_len = temp_len;
-				pr_debug("diag: In %s, successfully reallocated msg_mask update buffer to len: %d\n",
+				DIAG_DBUG("diag: In %s, successfully reallocated msg_mask update buffer to len: %d\n",
 					 __func__, mask_info->update_buf_len);
 			}
 		} else if (mask_info->status == DIAG_CTRL_MASK_ALL_ENABLED) {
@@ -735,6 +736,14 @@ static int diag_cmd_set_msg_mask(unsigned char *src_buf, int src_len,
 	memcpy(dest_buf + write_len, src_buf + header_len, mask_size);
 	write_len += mask_size;
 	for (i = 0; i < NUM_PERIPHERALS; i++) {
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & DQ_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & WCNSS_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
 		if (!diag_check_update(i))
 			continue;
 		diag_send_msg_mask_update(i, req->ssid_first, req->ssid_last);
@@ -794,11 +803,18 @@ static int diag_cmd_set_all_msg_mask(unsigned char *src_buf, int src_len,
 	write_len += header_len;
 
 	for (i = 0; i < NUM_PERIPHERALS; i++) {
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & DQ_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & WCNSS_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
 		if (!diag_check_update(i))
 			continue;
 		diag_send_msg_mask_update(i, ALL_SSID, ALL_SSID);
 	}
-
 	return write_len;
 }
 
@@ -888,11 +904,18 @@ static int diag_cmd_update_event_mask(unsigned char *src_buf, int src_len,
 	write_len += mask_len;
 
 	for (i = 0; i < NUM_PERIPHERALS; i++) {
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & DQ_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & WCNSS_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
 		if (!diag_check_update(i))
 			continue;
 		diag_send_event_mask_update(i);
 	}
-
 	return write_len;
 }
 
@@ -935,6 +958,14 @@ static int diag_cmd_toggle_events(unsigned char *src_buf, int src_len,
 	header.cmd_code = DIAG_CMD_EVENT_TOGGLE;
 	header.padding = 0;
 	for (i = 0; i < NUM_PERIPHERALS; i++) {
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & DQ_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & WCNSS_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
 		if (!diag_check_update(i))
 			continue;
 		diag_send_event_mask_update(i);
@@ -1189,6 +1220,14 @@ static int diag_cmd_set_log_mask(unsigned char *src_buf, int src_len,
 	write_len += payload_len;
 
 	for (i = 0; i < NUM_PERIPHERALS; i++) {
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & DQ_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & WCNSS_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
 		if (!diag_check_update(i))
 			continue;
 		diag_send_log_mask_update(i, req->equip_id);
@@ -1240,11 +1279,18 @@ static int diag_cmd_disable_log_mask(unsigned char *src_buf, int src_len,
 	memcpy(dest_buf, &header, sizeof(struct diag_log_config_rsp_t));
 	write_len += sizeof(struct diag_log_config_rsp_t);
 	for (i = 0; i < NUM_PERIPHERALS; i++) {
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & DQ_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
+		if (i == PERIPHERAL_MODEM && (diag_rb_enable & WCNSS_FILTER_MASK)) {
+			printk("diag(%d): Filter Modem mask\n", __LINE__);
+			continue;
+		}
 		if (!diag_check_update(i))
 			continue;
 		diag_send_log_mask_update(i, ALL_EQUIP_ID);
 	}
-
 	return write_len;
 }
 

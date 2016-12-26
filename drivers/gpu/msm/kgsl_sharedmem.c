@@ -18,6 +18,7 @@
 #include <linux/kmemleak.h>
 #include <linux/highmem.h>
 #include <linux/scatterlist.h>
+#include <linux/msm_kgsl.h>
 #include <soc/qcom/scm.h>
 #include <soc/qcom/secure_buffer.h>
 
@@ -105,7 +106,8 @@ static void kgsl_cma_unlock_secure(struct kgsl_memdesc *memdesc);
 static ssize_t
 mem_entry_show(struct kgsl_process_private *priv, int type, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%llu\n", priv->stats[type].cur);
+	uint64_t cur = atomic_long_read(&priv->stats[type].cur);
+	return snprintf(buf, PAGE_SIZE, "%llu\n", cur);
 }
 
 /**
@@ -271,6 +273,15 @@ static ssize_t kgsl_drv_full_cache_threshold_show(struct device *dev,
 			kgsl_driver.full_cache_threshold);
 }
 
+static ssize_t kgsl_alloc_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			kgsl_get_alloc_size(true));
+}
+
+
 static DEVICE_ATTR(vmalloc, 0444, kgsl_drv_memstat_show, NULL);
 static DEVICE_ATTR(vmalloc_max, 0444, kgsl_drv_memstat_show, NULL);
 static DEVICE_ATTR(page_alloc, 0444, kgsl_drv_memstat_show, NULL);
@@ -284,6 +295,7 @@ static DEVICE_ATTR(mapped_max, 0444, kgsl_drv_memstat_show, NULL);
 static DEVICE_ATTR(full_cache_threshold, 0644,
 		kgsl_drv_full_cache_threshold_show,
 		kgsl_drv_full_cache_threshold_store);
+static DEVICE_ATTR(kgsl_alloc, 0444, kgsl_alloc_show, NULL);
 
 static const struct device_attribute *drv_attr_list[] = {
 	&dev_attr_vmalloc,
@@ -297,6 +309,7 @@ static const struct device_attribute *drv_attr_list[] = {
 	&dev_attr_mapped,
 	&dev_attr_mapped_max,
 	&dev_attr_full_cache_threshold,
+	&dev_attr_kgsl_alloc,
 	NULL
 };
 
@@ -405,6 +418,8 @@ done:
 
 static void kgsl_page_alloc_free(struct kgsl_memdesc *memdesc)
 {
+	struct kgsl_process_private *priv = memdesc->private;
+
 	kgsl_page_alloc_unmap_kernel(memdesc);
 	/* we certainly do not expect the hostptr to still be mapped */
 	BUG_ON(memdesc->hostptr);
@@ -444,6 +459,8 @@ static void kgsl_page_alloc_free(struct kgsl_memdesc *memdesc)
 	else
 		kgsl_pool_free_sgt(memdesc->sgt);
 
+	if (priv)
+		kgsl_process_sub_stats(priv, KGSL_MEM_ENTRY_PAGE_ALLOC, memdesc->size);
 }
 
 /*
@@ -620,14 +637,8 @@ EXPORT_SYMBOL(kgsl_cache_range_op);
 #ifndef CONFIG_ALLOC_BUFFERS_IN_4K_CHUNKS
 static inline int get_page_size(size_t size, unsigned int align)
 {
-	if (align >= ilog2(SZ_1M) && size >= SZ_1M)
-		return SZ_1M;
-	else if (align >= ilog2(SZ_64K) && size >= SZ_64K)
-		return SZ_64K;
-	else if (align >= ilog2(SZ_8K) && size >= SZ_8K)
-		return SZ_8K;
-	else
-		return PAGE_SIZE;
+	return (align >= ilog2(SZ_64K) && size >= SZ_64K)
+					? SZ_64K : PAGE_SIZE;
 }
 #else
 static inline int get_page_size(size_t size, unsigned int align)
@@ -635,6 +646,39 @@ static inline int get_page_size(size_t size, unsigned int align)
 	return PAGE_SIZE;
 }
 #endif
+
+static void kgsl_zero_pages(struct page **pages, unsigned int pcount)
+{
+	unsigned int j;
+	unsigned int step = ((VMALLOC_END - VMALLOC_START)/8) >> PAGE_SHIFT;
+	pgprot_t page_prot = pgprot_writecombine(PAGE_KERNEL);
+	void *ptr;
+
+	for (j = 0; j < pcount; j += step) {
+		step = min(step, pcount - j);
+
+		ptr = vmap(&pages[j], step, VM_IOREMAP, page_prot);
+
+		if (ptr != NULL) {
+			memset(ptr, 0, step * PAGE_SIZE);
+			dmac_flush_range(ptr, ptr + step * PAGE_SIZE);
+			vunmap(ptr);
+		} else {
+			int k;
+			
+
+			for (k = j; k < j + step; k++) {
+				ptr = kmap_atomic(pages[k]);
+				memset(ptr, 0, PAGE_SIZE);
+				dmac_flush_range(ptr, ptr + PAGE_SIZE);
+				kunmap_atomic(ptr);
+			}
+			
+			if (step > 1)
+				step >>= 1;
+		}
+	}
+}
 
 int
 kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
@@ -660,10 +704,8 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 	 * larger however to accomodate hardware quirks
 	 */
 
-	if (align < ilog2(page_size)) {
+	if (align < ilog2(page_size))
 		kgsl_memdesc_set_align(memdesc, ilog2(page_size));
-		align = ilog2(page_size);
-	}
 
 	/*
 	 * There needs to be enough room in the page array to be able to
@@ -695,13 +737,18 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 	while (len > 0) {
 		int page_count;
 
-		page_count = kgsl_pool_alloc_page(&page_size,
+		
+		if (len < page_size)
+			page_size = PAGE_SIZE;
+
+		page_count = kgsl_pool_alloc_page(page_size,
 					memdesc->pages + pcount,
-					len_alloc - pcount,
-					&align);
+					len_alloc - pcount);
 		if (page_count <= 0) {
-			if (page_count == -EAGAIN)
+			if (page_size != PAGE_SIZE) {
+				page_size = PAGE_SIZE;
 				continue;
+			}
 
 			/*
 			 * Update sglen and memdesc size,as requested allocation
@@ -723,9 +770,6 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 		len -= page_size;
 		memdesc->size += page_size;
 		memdesc->page_count += page_count;
-
-		/* Get the needed page size for the next iteration */
-		page_size = get_page_size(len, align);
 	}
 
 	/* Call to the hypervisor to lock any secure buffer allocations */
@@ -782,6 +826,10 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 
 	KGSL_STATS_ADD(memdesc->size, &kgsl_driver.stats.page_alloc,
 		&kgsl_driver.stats.page_alloc_max);
+	if (memdesc->private)
+		kgsl_process_add_stats(memdesc->private, KGSL_MEM_ENTRY_PAGE_ALLOC, size);
+
+	kgsl_zero_pages(memdesc->pages, pcount);
 
 done:
 	if (ret) {

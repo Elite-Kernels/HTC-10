@@ -147,8 +147,8 @@
 
 			qcom,cdc-reset-gpio = <&tlmm 64 0>;
 			pinctrl-names = "default", "idle";
-			pinctrl-0 = <&cdc_reset_active>;
-			pinctrl-1 = <&cdc_reset_sleep>;
+//			pinctrl-0 = <&cdc_reset_active>; /* HTC_AUD */
+//			pinctrl-1 = <&cdc_reset_sleep>; /* HTC_AUD */
 
 			clock-names = "wcd_clk";
 			clocks = <&clock_audio clk_audio_lpass_mclk2>;
@@ -259,10 +259,14 @@
 			qcom,msm-mi2s-rx-lines = <2>;
 			qcom,msm-mi2s-tx-lines = <1>;
 			pinctrl-names = "default", "sleep";
+//HTC_AUD_START
+/*
 			pinctrl-0 = <&tert_mi2s_active &tert_mi2s_sd0_active
 						&tert_mi2s_sd1_active>;
 			pinctrl-1 = <&tert_mi2s_sleep &tert_mi2s_sd0_sleep
 						&tert_mi2s_sd1_sleep>;
+*/
+//HTC_AUD_END
 		};
 		dai_mi2s_quat: qcom,msm-dai-q6-mi2s-quat {
 			compatible = "qcom,msm-dai-q6-mi2s";

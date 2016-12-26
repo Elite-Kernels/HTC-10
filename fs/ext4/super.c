@@ -1874,11 +1874,14 @@ static int ext4_setup_super(struct super_block *sb, struct ext4_super_block *es,
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	int res = 0;
 
+#if 0
+	
 	if (le32_to_cpu(es->s_rev_level) > EXT4_MAX_SUPP_REV) {
 		ext4_msg(sb, KERN_ERR, "revision level too high, "
 			 "forcing read-only mode");
 		res = MS_RDONLY;
 	}
+#endif
 	if (read_only)
 		goto done;
 	if (!(sbi->s_mount_state & EXT4_VALID_FS))
@@ -4547,6 +4550,18 @@ static int ext4_commit_super(struct super_block *sb, int sync)
 	struct ext4_super_block *es = EXT4_SB(sb)->s_es;
 	struct buffer_head *sbh = EXT4_SB(sb)->s_sbh;
 	int error = 0;
+
+	
+	if (cpu_to_le32(es->s_creator_os) != EXT4_OS_LINUX) {
+		ext4_msg(sb, KERN_ERR, "s_creator_os uncorrect: 0x%08x, try to recover"
+			, cpu_to_le32(es->s_creator_os));
+		es->s_creator_os = cpu_to_le32(EXT4_OS_LINUX);
+	}
+	if (cpu_to_le32(es->s_rev_level) != EXT4_DYNAMIC_REV) {
+		ext4_msg(sb, KERN_ERR, "s_rev_level uncorrect: 0x%08x, try to recover"
+			, cpu_to_le32(es->s_rev_level));
+		es->s_rev_level = cpu_to_le32(EXT4_DYNAMIC_REV);
+	}
 
 	if (!sbh || block_device_ejected(sb))
 		return error;

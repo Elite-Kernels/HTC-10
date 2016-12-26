@@ -3171,8 +3171,7 @@ static void a5xx_irq_storm_worker(struct work_struct *work)
 	KGSL_DRV_WARN(device, "Re-enabled A5XX_INT_CP_CACHE_FLUSH_TS");
 	mutex_unlock(&device->mutex);
 
-	/* Reschedule just to make sure everything retires */
-	kgsl_schedule_work(&device->event_work);
+	
 	adreno_dispatcher_schedule(device);
 }
 
@@ -3223,8 +3222,6 @@ static void a5xx_cp_callback(struct adreno_device *adreno_dev, int bit)
 	}
 
 	a5xx_preemption_trigger(adreno_dev);
-
-	kgsl_schedule_work(&device->event_work);
 	adreno_dispatcher_schedule(device);
 }
 

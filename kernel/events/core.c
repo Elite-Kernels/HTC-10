@@ -174,6 +174,8 @@ static struct srcu_struct pmus_srcu;
  */
 #ifdef CONFIG_PERF_EVENTS_USERMODE
 int sysctl_perf_event_paranoid __read_mostly = -1;
+#elif defined CONFIG_SECURITY_PERF_EVENTS_RESTRICT
+int sysctl_perf_event_paranoid __read_mostly = 3;
 #else
 int sysctl_perf_event_paranoid __read_mostly = 1;
 #endif
@@ -7310,6 +7312,9 @@ SYSCALL_DEFINE5(perf_event_open,
 	/* for future expandability... */
 	if (flags & ~PERF_FLAG_ALL)
 		return -EINVAL;
+
+	if (perf_paranoid_any() && !capable(CAP_SYS_ADMIN))
+		return -EACCES;
 
 	err = perf_copy_attr(attr_uptr, &attr);
 	if (err)

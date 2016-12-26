@@ -133,7 +133,8 @@ typedef void (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 /* Has write method(s) */
 #define FMODE_CAN_WRITE         ((__force fmode_t)0x40000)
 
-/* File was opened by fanotify and shouldn't generate fanotify events */
+#define FMODE_NONMAPPABLE       ((__force fmode_t)0x400000)
+
 #define FMODE_NONOTIFY		((__force fmode_t)0x1000000)
 
 /*
@@ -537,11 +538,9 @@ struct posix_acl;
 #define IOP_LOOKUP	0x0002
 #define IOP_NOFOLLOW	0x0004
 
-/*
- * Keep mostly read-only and often accessed (especially for
- * the RCU path lookup and 'stat' data) fields at the beginning
- * of the 'struct inode'
- */
+#define AID_SDCARD_RW 1015
+#define AID_SDCARD_R  1028
+
 struct inode {
 	umode_t			i_mode;
 	unsigned short		i_opflags;
@@ -1281,7 +1280,11 @@ struct super_block {
 	/* Being remounted read-only */
 	int s_readonly_remount;
 
-	/* AIO completions deferred from interrupt context */
+	
+#define FLAG_ASYNC_FSYNC       0x1
+	unsigned int fsync_flags;
+
+	
 	struct workqueue_struct *s_dio_done_wq;
 	struct hlist_head s_pins;
 
@@ -1524,6 +1527,8 @@ struct file_operations {
 	long (*fallocate)(struct file *file, int mode, loff_t offset,
 			  loff_t len);
 	int (*show_fdinfo)(struct seq_file *m, struct file *f);
+	
+	struct file* (*get_lower_file)(struct file *f);
 };
 
 struct inode_operations {

@@ -386,8 +386,9 @@ int suspend_devices_and_enter(suspend_state_t state)
 	error = platform_suspend_begin(state);
 	if (error)
 		goto Close;
+	if (!suspend_console_deferred)
+		suspend_console();
 
-	suspend_console();
 	suspend_test_start();
 	error = dpm_suspend_start(PMSG_SUSPEND);
 	if (error) {
@@ -408,7 +409,8 @@ int suspend_devices_and_enter(suspend_state_t state)
 	dpm_resume_end(PMSG_RESUME);
 	suspend_test_finish("resume devices");
 	trace_suspend_resume(TPS("resume_console"), state, true);
-	resume_console();
+	if (!suspend_console_deferred)
+		resume_console();
 	trace_suspend_resume(TPS("resume_console"), state, false);
 
  Close:
@@ -464,9 +466,7 @@ static int enter_state(suspend_state_t state)
 		freeze_begin();
 
 	trace_suspend_resume(TPS("sync_filesystems"), 0, true);
-	printk(KERN_INFO "PM: Syncing filesystems ... ");
-	sys_sync();
-	printk("done.\n");
+	suspend_sys_sync_queue();
 	trace_suspend_resume(TPS("sync_filesystems"), 0, false);
 
 	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);

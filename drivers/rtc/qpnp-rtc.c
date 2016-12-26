@@ -108,6 +108,18 @@ qpnp_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	struct qpnp_rtc *rtc_dd = dev_get_drvdata(dev);
 
 	rtc_tm_to_time(tm, &secs);
+	rc = rtc_valid_tm(tm);
+	if (rc) {
+		dev_err(dev, "[Power_FDA] Invalid time value written to RTC\n");
+		dev_err(dev, "[Power_FDA] secs = %lu, h:m:s == %d:%d:%d, d/m/y = %d/%d/%d\n",
+				secs, tm->tm_hour, tm->tm_min, tm->tm_sec,
+				tm->tm_mday, tm->tm_mon, tm->tm_year);
+		dump_stack();
+		return rc;
+	}
+	dev_info(dev, "[RTC] set rtc to secs = %lu, h:m:s == %d:%d:%d, d/m/y = %d/%d/%d\n",
+			secs, tm->tm_hour, tm->tm_min, tm->tm_sec,
+			tm->tm_mday, tm->tm_mon, tm->tm_year);
 
 	value[0] = secs & 0xFF;
 	value[1] = (secs >> 8) & 0xFF;
@@ -272,7 +284,10 @@ qpnp_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	rc = rtc_valid_tm(tm);
 	if (rc) {
-		dev_err(dev, "Invalid time read from RTC\n");
+		dev_err(dev, "[Power_FDA] Invalid time read from RTC\n");
+		dev_err(dev, "[Power_FDA] secs = %lu, h:m:s == %d:%d:%d, d/m/y = %d/%d/%d\n",
+				secs, tm->tm_hour, tm->tm_min, tm->tm_sec,
+				tm->tm_mday, tm->tm_mon, tm->tm_year);
 		return rc;
 	}
 
@@ -300,7 +315,7 @@ qpnp_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 	 */
 	rc = qpnp_rtc_read_time(dev, &rtc_tm);
 	if (rc) {
-		dev_err(dev, "Unable to read RTC time\n");
+		dev_err(dev, "[Power_FDA] set alarm: Unable to read RTC time\n");
 		return -EINVAL;
 	}
 
@@ -368,7 +383,11 @@ qpnp_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
 
 	rc = rtc_valid_tm(&alarm->time);
 	if (rc) {
-		dev_err(dev, "Invalid time read from RTC\n");
+		dev_err(dev, "[Power_FDA] Invalid time read from RTC\n");
+		dev_err(dev, "[Power_FDA] Alarm set for - h:r:s=%d:%d:%d, d/m/y=%d/%d/%d\n",
+				alarm->time.tm_hour, alarm->time.tm_min,
+				alarm->time.tm_sec, alarm->time.tm_mday,
+				alarm->time.tm_mon, alarm->time.tm_year);
 		return rc;
 	}
 

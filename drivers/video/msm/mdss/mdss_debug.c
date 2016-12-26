@@ -139,7 +139,7 @@ static ssize_t panel_debug_base_reg_write(struct file *file,
 	struct mdss_mdp_ctl *ctl;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
 	struct dsi_cmd_desc dsi_write_cmd = {
-		{0/*data type*/, 1, 0, 0, 0, 0/* len */}, reg};
+		{0, 1, 0, 0, 0, 0}, reg};
 	struct dcs_cmd_req cmdreq;
 
 	if (!dbg || !mdata)
@@ -208,7 +208,8 @@ static ssize_t panel_debug_base_reg_read(struct file *file,
 			char __user *user_buf, size_t count, loff_t *ppos)
 {
 	struct mdss_debug_base *dbg = file->private_data;
-	u32 i, len = 0, reg_buf_len = 0;
+	u32 i, reg_buf_len = 0;
+	int len = 0;
 	char *panel_reg_buf, *rx_buf;
 	struct mdss_data_type *mdata = mdss_res;
 	struct mdss_mdp_ctl *ctl = mdata->ctl_off + 0;
@@ -1359,7 +1360,7 @@ static inline struct mdss_mdp_misr_map *mdss_misr_get_map(u32 block_id,
 		return NULL;
 	}
 
-	pr_debug("MISR Module(%d) CTRL(0x%x) SIG(0x%x) intf_base(0x%p)\n",
+	pr_debug("MISR Module(%d) CTRL(0x%x) SIG(0x%x) intf_base(0x%pK)\n",
 			block_id, map->ctrl_reg, map->value_reg, intf_base);
 	return map;
 }
@@ -1432,7 +1433,7 @@ int mdss_misr_set(struct mdss_data_type *mdata,
 	bool use_mdp_up_misr = false;
 
 	if (!mdata || !req || !ctl) {
-		pr_err("Invalid input params: mdata = %p req = %p ctl = %p",
+		pr_err("Invalid input params: mdata = %pK req = %pK ctl = %pK",
 			mdata, req, ctl);
 		return -EINVAL;
 	}
@@ -1512,7 +1513,7 @@ int mdss_misr_set(struct mdss_data_type *mdata,
 
 		writel_relaxed(config,
 				mdata->mdp_base + map->ctrl_reg);
-		pr_debug("MISR_CTRL=0x%x [base:0x%p reg:0x%x config:0x%x]\n",
+		pr_debug("MISR_CTRL=0x%x [base:0x%pK reg:0x%x config:0x%x]\n",
 				readl_relaxed(mdata->mdp_base + map->ctrl_reg),
 				mdata->mdp_base, map->ctrl_reg, config);
 	}

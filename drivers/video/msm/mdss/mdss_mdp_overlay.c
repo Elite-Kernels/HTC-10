@@ -1081,7 +1081,7 @@ struct mdss_mdp_data *mdss_mdp_overlay_buf_alloc(struct msm_fb_data_type *mfd,
 	list_move_tail(&buf->buf_list, &mdp5_data->bufs_used);
 	list_add_tail(&buf->pipe_list, &pipe->buf_queue);
 
-	pr_debug("buffer alloc: %p\n", buf);
+	pr_debug("buffer alloc: %pK\n", buf);
 
 	return buf;
 }
@@ -1135,7 +1135,7 @@ void mdss_mdp_overlay_buf_free(struct msm_fb_data_type *mfd,
 	buf->last_freed = local_clock();
 	buf->state = MDP_BUF_STATE_UNUSED;
 
-	pr_debug("buffer freed: %p\n", buf);
+	pr_debug("buffer freed: %pK\n", buf);
 
 	list_move_tail(&buf->buf_list, &mdp5_data->bufs_pool);
 }
@@ -1516,7 +1516,7 @@ static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 		if (buf) {
 			switch (buf->state) {
 			case MDP_BUF_STATE_READY:
-				pr_debug("pnum=%d buf=%p first buffer ready\n",
+				pr_debug("pnum=%d buf=%pK first buffer ready\n",
 						pipe->num, buf);
 				break;
 			case MDP_BUF_STATE_ACTIVE:
@@ -1536,7 +1536,7 @@ static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 				}
 				break;
 			default:
-				pr_err("invalid state of buf %p=%d\n",
+				pr_err("invalid state of buf %pK=%d\n",
 						buf, buf->state);
 				BUG();
 				break;
@@ -1793,6 +1793,8 @@ int mdss_mode_switch(struct msm_fb_data_type *mfd, u32 mode)
 		mdss_mdp_update_panel_info(mfd, 1, 0);
 		mdss_mdp_switch_to_cmd_mode(ctl, 0);
 		mdss_mdp_ctl_stop(ctl, MDSS_PANEL_POWER_OFF);
+		writel_relaxed(0xffffffff, ctl->mdata->mdp_base + MDSS_REG_HW_INTR2_CLEAR);
+		wmb();
 	} else if (mode == MIPI_VIDEO_PANEL) {
 		if (ctl->ops.wait_pingpong)
 			rc = ctl->ops.wait_pingpong(ctl, NULL);
@@ -1837,6 +1839,8 @@ int mdss_mode_switch_post(struct msm_fb_data_type *mfd, u32 mode)
 			MDSS_EVENT_DSI_DYNAMIC_SWITCH,
 			(void *) MIPI_VIDEO_PANEL, CTL_INTF_EVENT_FLAG_DEFAULT);
 		pr_debug("%s, end\n", __func__);
+		writel_relaxed(0xffffffff, ctl->mdata->mdp_base + MDSS_REG_HW_INTR2_CLEAR);
+		wmb();
 	} else if (mode == MIPI_CMD_PANEL) {
 		/*
 		 * Needed to balance out clk refcount when going
@@ -2237,7 +2241,7 @@ static int __mdss_mdp_overlay_release_all(struct msm_fb_data_type *mfd,
 	u32 unset_ndx = 0;
 	int cnt = 0;
 
-	pr_debug("releasing all resources for fb%d file:%p\n",
+	pr_debug("releasing all resources for fb%d file:%pK\n",
 		mfd->index, file);
 
 	mutex_lock(&mdp5_data->ov_lock);
@@ -2950,6 +2954,7 @@ int mdss_mdp_dfps_update_params(struct msm_fb_data_type *mfd,
 		pr_warn("Unsupported FPS. Configuring to max_fps = %d\n",
 				pdata->panel_info.max_fps);
 		dfps = pdata->panel_info.max_fps;
+		dfps_data->fps = dfps;
 	}
 
 	dfps_update_panel_params(pdata, dfps_data);
@@ -5839,7 +5844,7 @@ static int mdss_mdp_scaler_lut_init(struct mdss_data_type *mdata,
 		struct mdp_scale_luts_info *lut_tbl)
 {
 	struct mdss_mdp_qseed3_lut_tbl *qseed3_lut_tbl;
-	int ret;
+	int ret = 0;
 
 	if (!mdata->scaler_off)
 		return -EFAULT;

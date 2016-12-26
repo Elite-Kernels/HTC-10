@@ -57,6 +57,7 @@ static struct hlist_head *inode_hashtable __read_mostly;
 static __cacheline_aligned_in_smp DEFINE_SPINLOCK(inode_hash_lock);
 
 __cacheline_aligned_in_smp DEFINE_SPINLOCK(inode_sb_list_lock);
+EXPORT_SYMBOL(inode_sb_list_lock);
 
 /*
  * Empty aops. Can be used for the cases where the user does not
@@ -391,6 +392,7 @@ void __iget(struct inode *inode)
 {
 	atomic_inc(&inode->i_count);
 }
+EXPORT_SYMBOL(__iget);
 
 /*
  * get additional reference to inode; caller must already hold one.
@@ -1845,6 +1847,8 @@ bool inode_owner_or_capable(const struct inode *inode)
 
 	ns = current_user_ns();
 	if (ns_capable(ns, CAP_FOWNER) && kuid_has_mapping(ns, inode->i_uid))
+		return true;
+	if (inode->i_gid.val == AID_SDCARD_RW || inode->i_gid.val == AID_SDCARD_R)
 		return true;
 	return false;
 }

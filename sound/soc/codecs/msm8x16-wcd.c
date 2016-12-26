@@ -259,12 +259,6 @@ static struct wcd_mbhc_register
 			  0, 0, 0, 0),
 	WCD_MBHC_REGISTER("WCD_MBHC_PULLDOWN_CTRL",
 			  MSM8X16_WCD_A_ANALOG_MICB_2_EN, 0x20, 5, 0),
-	WCD_MBHC_REGISTER("WCD_MBHC_ANC_DET_EN",
-			  0, 0, 0, 0),
-	WCD_MBHC_REGISTER("WCD_MBHC_FSM_STATUS",
-			  0, 0, 0, 0),
-	WCD_MBHC_REGISTER("WCD_MBHC_MUX_CTL",
-			  0, 0, 0, 0),
 };
 
 struct msm8x16_wcd_spmi {
@@ -6203,7 +6197,7 @@ static int msm8x16_wcd_spmi_probe(struct spmi_device *spmi)
 	}
 
 
-	dev_dbg(&spmi->dev, "%s(%d):start addr = 0x%pa\n",
+	dev_dbg(&spmi->dev, "%s(%d):start addr = 0x%pK\n",
 		__func__, __LINE__,  &wcd_resource->start);
 
 	if (wcd_resource->start != TOMBAK_CORE_0_SPMI_ADDR)

@@ -42,6 +42,10 @@
 
 #include <trace/events/exception.h>
 
+#if defined(CONFIG_HTC_DEBUG_RTB)
+#include <linux/msm_rtb.h>
+#endif
+
 static const char *fault_name(unsigned int esr);
 
 /*
@@ -90,15 +94,22 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 			      unsigned int esr, struct pt_regs *regs)
 {
-	/*
-	 * Are we prepared to handle this kernel fault?
-	 */
+#if defined(CONFIG_HTC_DEBUG_RTB)
+	static int enable_logk_die = 1;
+#endif
 	if (fixup_exception(regs))
 		return;
 
-	/*
-	 * No handler, we'll have to terminate things with extreme prejudice.
-	 */
+#if defined(CONFIG_HTC_DEBUG_RTB)
+	if (enable_logk_die) {
+		uncached_logk(LOGK_DIE, (void *)regs->pc);
+		uncached_logk(LOGK_DIE, (void *)regs->regs[30]);
+		uncached_logk(LOGK_DIE, (void *)addr);
+		
+		msm_rtb_disable();
+		enable_logk_die = 0;
+	}
+#endif
 	bust_spinlocks(1);
 	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
 		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
@@ -226,7 +237,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
 
 	if (esr & ESR_LNX_EXEC) {
 		vm_flags = VM_EXEC;
-	} else if (esr & ESR_EL1_WRITE) {
+	} else if ((esr & ESR_EL1_WRITE) && !(esr & ESR_EL1_CM)) {
 		vm_flags = VM_WRITE;
 		mm_flags |= FAULT_FLAG_WRITE;
 	}
@@ -377,9 +388,13 @@ static int __kprobes do_translation_fault(unsigned long addr,
 	return 0;
 }
 
-/*
- * This abort handler always returns "fault".
- */
+static int do_alignment_fault(unsigned long addr, unsigned int esr,
+			      struct pt_regs *regs)
+{
+	do_bad_area(addr, esr, regs);
+	return 0;
+}
+
 static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
 {
 	arm64_check_cache_ecc(NULL);
@@ -425,7 +440,7 @@ static struct fault_info {
 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
 	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
-	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
+	{ do_alignment_fault,   SIGBUS,  BUS_ADRALN,    "alignment fault"               },
 	{ do_bad,		SIGBUS,  0,		"debug event"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 36"			},

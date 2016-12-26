@@ -36,6 +36,10 @@
 #include "irq-gic-common.h"
 #include "irqchip.h"
 
+#ifdef CONFIG_HTC_DEBUG_WATCHDOG
+#include <linux/htc_debug_tools.h>
+#endif
+
 struct redist_region {
 	void __iomem		*redist_base;
 	phys_addr_t		phys_base;
@@ -60,6 +64,7 @@ struct gic_chip_data {
 };
 
 static struct gic_chip_data gic_data __read_mostly;
+static DEFINE_RAW_SPINLOCK(irq_controller_lock);
 
 #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
 #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
@@ -364,14 +369,17 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	u32 pending[32];
 	void __iomem *base = gic_data_dist_base(gic);
 
+	msm_show_resume_irq_mask = 1;
 	if (!msm_show_resume_irq_mask)
 		return;
 
+	raw_spin_lock(&irq_controller_lock);
 	for (i = 0; i * 32 < gic->irq_nr; i++) {
 		enabled = readl_relaxed(base + GICD_ICENABLER + i * 4);
 		pending[i] = readl_relaxed(base + GICD_ISPENDR + i * 4);
 		pending[i] &= enabled;
 	}
+	raw_spin_unlock(&irq_controller_lock);
 
 	for (i = find_first_bit((unsigned long *)pending, gic->irq_nr);
 	     i < gic->irq_nr;
@@ -385,7 +393,11 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 		else if (desc->action && desc->action->name)
 			name = desc->action->name;
 
+#ifdef CONFIG_HTC_POWER_DEBUG
+		pr_info("[WAKEUP] Resume caused by gic-%d, %d triggered %s\n", i, irq, name);
+#else
 		pr_warn("%s: %d triggered %s\n", __func__, irq, name);
+#endif
 	}
 }
 
@@ -445,6 +457,14 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 
 		if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
 			int err;
+
+#if defined(CONFIG_HTC_DEBUG_WATCHDOG)
+			
+			if (irqnr == 27 && smp_processor_id() == 0) {
+				unsigned long long timestamp = sched_clock();
+				htc_debug_watchdog_check_pet(timestamp);
+			}
+#endif 
 			uncached_logk(LOGK_IRQ, (void *)(uintptr_t)irqnr);
 			err = handle_domain_irq(gic_data.domain, irqnr, regs);
 			if (err) {

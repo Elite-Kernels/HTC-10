@@ -227,7 +227,7 @@ struct audio_client *q6asm_get_audio_client(int session_id);
 int q6asm_audio_client_buf_alloc(unsigned int dir/* 1:Out,0:In */,
 				struct audio_client *ac,
 				unsigned int bufsz,
-				unsigned int bufcnt);
+				uint32_t bufcnt);
 int q6asm_audio_client_buf_alloc_contiguous(unsigned int dir
 				/* 1:Out,0:In */,
 				struct audio_client *ac,
@@ -556,4 +556,9 @@ int q6asm_send_mtmx_strtr_window(struct audio_client *ac,
 /* Retrieve the current DSP path delay */
 int q6asm_get_path_delay(struct audio_client *ac);
 
+//HTC_AUD_START
+int q6asm_enable_effect(struct audio_client *ac, uint32_t module_id,
+			uint32_t param_id, uint32_t payload_size,
+			void *payload);
+//HTC_AUD_END
 #endif /* __Q6_ASM_H__ */

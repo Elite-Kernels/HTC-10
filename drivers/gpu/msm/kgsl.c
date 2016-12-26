@@ -42,6 +42,7 @@
 #include "kgsl_sync.h"
 #include "kgsl_compat.h"
 #include "kgsl_pool.h"
+#include "kgsl_htc.h"
 
 #undef MODULE_PARAM_PREFIX
 #define MODULE_PARAM_PREFIX "kgsl."
@@ -424,8 +425,12 @@ kgsl_mem_entry_attach_process(struct kgsl_mem_entry *entry,
 		return -EBADF;
 
 	ret = kgsl_mem_entry_track_gpuaddr(process, entry);
-	if (ret)
+	if (ret) {
+		spin_lock(&process->mem_lock);
+		kgsl_dump_contextpid_locked(&dev_priv->device->context_idr);
+		spin_unlock(&process->mem_lock);
 		goto err_put_proc_priv;
+	}
 
 	idr_preload(GFP_KERNEL);
 	spin_lock(&process->mem_lock);
@@ -442,6 +447,7 @@ kgsl_mem_entry_attach_process(struct kgsl_mem_entry *entry,
 
 	entry->id = id;
 	entry->priv = process;
+	entry->memdesc.private = process;
 
 	/* map the memory after unlocking if gpuaddr has been assigned */
 	if (entry->memdesc.gpuaddr) {
@@ -485,7 +491,7 @@ static void kgsl_mem_entry_detach_process(struct kgsl_mem_entry *entry)
 	entry->id = 0;
 
 	type = kgsl_memdesc_usermem_type(&entry->memdesc);
-	entry->priv->stats[type].cur -= entry->memdesc.size;
+	atomic_long_sub(entry->memdesc.size, &entry->priv->stats[type].cur);
 	spin_unlock(&entry->priv->mem_lock);
 
 	kgsl_mmu_unmap(entry->memdesc.pagetable, &entry->memdesc);
@@ -2922,6 +2928,7 @@ static struct kgsl_mem_entry *gpumem_alloc_entry(
 	struct kgsl_process_private *private = dev_priv->process_priv;
 	struct kgsl_mem_entry *entry;
 	unsigned int align;
+	struct kgsl_memdesc *memdesc = NULL;
 
 	flags &= KGSL_MEMFLAGS_GPUREADONLY
 		| KGSL_CACHEMODE_MASK
@@ -2965,6 +2972,8 @@ static struct kgsl_mem_entry *gpumem_alloc_entry(
 	flags = kgsl_filter_cachemode(flags);
 
 	entry = kgsl_mem_entry_create();
+	memdesc = &entry->memdesc;
+
 	if (entry == NULL)
 		return ERR_PTR(-ENOMEM);
 
@@ -2974,6 +2983,7 @@ static struct kgsl_mem_entry *gpumem_alloc_entry(
 	if (flags & KGSL_MEMFLAGS_SECURE)
 		entry->memdesc.priv |= KGSL_MEMDESC_SECURE;
 
+	memdesc->private = private;
 	ret = kgsl_allocate_user(dev_priv->device, &entry->memdesc,
 				private->pagetable, size, flags);
 	if (ret != 0)
@@ -3890,9 +3900,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	disable_irq(device->pwrctrl.interrupt_num);
 
 	KGSL_DRV_INFO(device,
-		"dev_id %d regs phys 0x%08lx size 0x%08x virt %p\n",
-		device->id, device->reg_phys, device->reg_len,
-		device->reg_virt);
+		"dev_id %d regs phys 0x%08lx size 0x%08x\n",
+		device->id, device->reg_phys, device->reg_len);
 
 	rwlock_init(&device->context_lock);
 
@@ -3952,10 +3961,10 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 				PM_QOS_DEFAULT_VALUE);
 	}
 
+	device->events_wq = alloc_workqueue("kgsl-events",
+		WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_SYSFS, 0);
 
-	device->events_wq = create_singlethread_workqueue("kgsl-events");
-
-	/* Initalize the snapshot engine */
+	
 	kgsl_device_snapshot_init(device);
 
 	/* Initialize common sysfs entries */
@@ -3963,6 +3972,9 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 
 	/* Initialize the memory pools */
 	kgsl_init_page_pools();
+
+	
+	kgsl_device_htc_init(device);
 
 	return 0;
 
@@ -4096,7 +4108,8 @@ static int __init kgsl_core_init(void)
 
 	INIT_LIST_HEAD(&kgsl_driver.pagetable_list);
 
-	kgsl_driver.workqueue = create_singlethread_workqueue("kgsl-workqueue");
+	kgsl_driver.workqueue = alloc_workqueue("kgsl-workqueue",
+		WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_SYSFS, 0);
 
 	kgsl_driver.mem_workqueue = alloc_workqueue("kgsl-mementry",
 		WQ_UNBOUND | WQ_MEM_RECLAIM, 0);
@@ -4108,6 +4121,8 @@ static int __init kgsl_core_init(void)
 		goto err;
 
 	kgsl_memfree_init();
+
+	kgsl_driver_htc_init(&kgsl_driver.priv);
 
 	return 0;
 

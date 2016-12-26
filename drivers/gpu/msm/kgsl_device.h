@@ -275,7 +275,6 @@ struct kgsl_device {
 	int mem_log;
 	int pwr_log;
 	struct kgsl_pwrscale pwrscale;
-	struct work_struct event_work;
 
 	int reset_counter; /* Track how many GPU core resets have occured */
 	int cff_dump_enable;
@@ -285,6 +284,9 @@ struct kgsl_device {
 
 	/* Number of active contexts seen globally for this device */
 	int active_context_count;
+
+	
+	int gpu_fault_no_panic;
 };
 
 #define KGSL_MMU_DEVICE(_mmu) \
@@ -295,8 +297,6 @@ struct kgsl_device {
 	.cmdbatch_gate = COMPLETION_INITIALIZER((_dev).cmdbatch_gate),\
 	.idle_check_ws = __WORK_INITIALIZER((_dev).idle_check_ws,\
 			kgsl_idle_check),\
-	.event_work  = __WORK_INITIALIZER((_dev).event_work,\
-			kgsl_process_events),\
 	.context_idr = IDR_INIT((_dev).context_idr),\
 	.wait_queue = __WAIT_QUEUE_HEAD_INITIALIZER((_dev).wait_queue),\
 	.active_cnt_wq = __WAIT_QUEUE_HEAD_INITIALIZER((_dev).active_cnt_wq),\
@@ -407,7 +407,7 @@ struct kgsl_process_private {
 	struct kobject kobj;
 	struct dentry *debug_root;
 	struct {
-		uint64_t cur;
+		atomic_long_t cur;
 		uint64_t max;
 	} stats[KGSL_MEM_ENTRY_MAX];
 	struct idr syncsource_idr;
@@ -495,9 +495,22 @@ struct kgsl_device *kgsl_get_device(int dev_idx);
 static inline void kgsl_process_add_stats(struct kgsl_process_private *priv,
 	unsigned int type, uint64_t size)
 {
-	priv->stats[type].cur += size;
-	if (priv->stats[type].max < priv->stats[type].cur)
-		priv->stats[type].max = priv->stats[type].cur;
+	uint64_t cur;
+	if (type >= KGSL_MEM_ENTRY_MAX)
+		return;
+
+	spin_lock(&priv->mem_lock);
+	atomic_long_add(size, &priv->stats[type].cur);
+	cur = atomic_long_read(&priv->stats[type].cur);
+	if (priv->stats[type].max < cur)
+		priv->stats[type].max = cur;
+	spin_unlock(&priv->mem_lock);
+}
+
+static inline void kgsl_process_sub_stats(struct kgsl_process_private *priv,
+		unsigned int type, size_t size)
+{
+	atomic_long_sub(size, &priv->stats[type].cur);
 }
 
 static inline void kgsl_regread(struct kgsl_device *device,
@@ -617,7 +630,7 @@ void kgsl_process_event_group(struct kgsl_device *device,
 	struct kgsl_event_group *group);
 void kgsl_flush_event_group(struct kgsl_device *device,
 		struct kgsl_event_group *group);
-void kgsl_process_events(struct work_struct *work);
+void kgsl_process_event_groups(struct kgsl_device *device);
 
 void kgsl_context_destroy(struct kref *kref);
 

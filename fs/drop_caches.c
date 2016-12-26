@@ -36,12 +36,14 @@ void drop_pagecache_sb(struct super_block *sb, void *unused)
 	spin_unlock(&inode_sb_list_lock);
 	iput(toput_inode);
 }
+EXPORT_SYMBOL(drop_pagecache_sb);
 
 static void drop_slab(void)
 {
 	int nr_objects;
 	struct shrink_control shrink = {
 		.gfp_mask = GFP_KERNEL,
+		.order = 0,
 	};
 
 	nodes_setall(shrink.nodes_to_scan);

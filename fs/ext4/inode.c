@@ -46,6 +46,7 @@
 #include "truncate.h"
 
 #include <trace/events/ext4.h>
+#include <trace/events/mmcio.h>
 
 #define MPAGE_DA_EXTENT_TAIL 0x01
 
@@ -3408,6 +3409,7 @@ int ext4_can_truncate(struct inode *inode)
 
 int ext4_punch_hole(struct inode *inode, loff_t offset, loff_t length)
 {
+#if 0
 	struct super_block *sb = inode->i_sb;
 	ext4_lblk_t first_block, stop_block;
 	struct address_space *mapping = inode->i_mapping;
@@ -3531,6 +3533,9 @@ out_dio:
 out_mutex:
 	mutex_unlock(&inode->i_mutex);
 	return ret;
+#else
+	return -EOPNOTSUPP;
+#endif
 }
 
 int ext4_inode_attach_jinode(struct inode *inode)

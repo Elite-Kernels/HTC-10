@@ -352,7 +352,15 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	state = decode_state(buf, n);
 	if (state < PM_SUSPEND_MAX)
+#ifdef CONFIG_HTC_POWER_DEBUG
+	{
+		pr_info("[R] suspend start\n");
+#endif
 		error = pm_suspend(state);
+#ifdef CONFIG_HTC_POWER_DEBUG
+		pr_info("[R] resume end\n");
+	}
+#endif
 	else if (state == PM_SUSPEND_MAX)
 		error = hibernate();
 	else
@@ -476,6 +484,38 @@ power_attr(autosleep);
 #endif /* CONFIG_PM_AUTOSLEEP */
 
 #ifdef CONFIG_PM_WAKELOCKS
+
+#ifdef CONFIG_PM_DEBUG
+char wakelock_debug_buf[1024];
+#define wakelock_debug_attr(_name) \
+static struct kobj_attribute _name##_attr = {   \
+        .attr   = {                             \
+                .name = __stringify(_name),     \
+                .mode = 0640,                   \
+        },                                      \
+        .show   = _name##_show,                 \
+        .store  = _name##_store,                \
+ }
+
+static ssize_t
+wakelock_debug_show(struct kobject *kobj, struct kobj_attribute *attr,
+                     char *buf)
+{
+        return scnprintf(buf, sizeof(wakelock_debug_buf), "%s", wakelock_debug_buf);
+}
+
+static ssize_t
+wakelock_debug_store(struct kobject *kobj, struct kobj_attribute *attr,
+                      const char *buf, size_t n)
+{
+        strncpy(wakelock_debug_buf, buf, sizeof(wakelock_debug_buf) - 1);
+        wakelock_debug_buf[sizeof(wakelock_debug_buf) - 1] = '\0';
+        pr_err("Start to monitor wakelock %s.\n", wakelock_debug_buf);
+        return n;
+}
+wakelock_debug_attr(wakelock_debug);
+#endif 
+
 static ssize_t wake_lock_show(struct kobject *kobj,
 			      struct kobj_attribute *attr,
 			      char *buf)
@@ -488,6 +528,12 @@ static ssize_t wake_lock_store(struct kobject *kobj,
 			       const char *buf, size_t n)
 {
 	int error = pm_wake_lock(buf);
+
+#ifdef CONFIG_PM_DEBUG
+	if (!strncmp(buf, wakelock_debug_buf, sizeof(buf)-1))
+		pr_err("%s PID: %i requests wakelock %s", current->comm, current->pid, buf);
+#endif
+
 	return error ? error : n;
 }
 
@@ -581,7 +627,84 @@ static ssize_t pm_freeze_timeout_store(struct kobject *kobj,
 
 power_attr(pm_freeze_timeout);
 
-#endif	/* CONFIG_FREEZER*/
+#endif	
+
+#ifdef CONFIG_HTC_PNPMGR
+int powersave_enabled = 0;
+static ssize_t
+powersave_show(struct kobject *kobj, struct kobj_attribute *attr,
+                char *buf)
+{
+	return sprintf(buf, "%d\n", powersave_enabled);
+}
+
+static ssize_t
+powersave_store(struct kobject *kobj, struct kobj_attribute *attr,
+                const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (kstrtoul(buf, 10, &val))
+		return -EINVAL;
+
+	printk(KERN_INFO "Change powersave attr from %d to %ld\n", powersave_enabled, val);
+	powersave_enabled = val;
+	sysfs_notify(kobj, NULL, "powersave");
+	return n;
+}
+power_attr(powersave);
+#endif
+
+static char ktop_buf[1024];
+static ssize_t
+ktop_accu_show(struct kobject *kobj, struct kobj_attribute *attr,
+                char *buf)
+{
+	return scnprintf(buf, sizeof(ktop_buf), "%s", ktop_buf);
+}
+
+static ssize_t
+ktop_accu_store(struct kobject *kobj, struct kobj_attribute *attr,
+                const char *buf, size_t n)
+{
+	strncpy(ktop_buf, buf, sizeof(ktop_buf) - 1);
+	ktop_buf[sizeof(ktop_buf) - 1] = '\0';
+	return n;
+}
+power_attr(ktop_accu);
+
+#define MAX_BUF 1024
+static char thermal_monitor_buf[MAX_BUF];
+static char *thermal_monitor_change[2] = { "thermal_monitor", NULL };
+
+#define thermal_attr(_name) \
+static struct kobj_attribute _name##_attr = {	\
+	.attr   = {				\
+		.name = __stringify(_name),	\
+		.mode = 0640,			\
+	},					\
+	.show   = _name##_show,			\
+	.store  = _name##_store,		\
+ }
+
+static ssize_t
+thermal_monitor_show(struct kobject *kobj, struct kobj_attribute *attr,
+		     char *buf)
+{
+	return scnprintf(buf, sizeof(thermal_monitor_buf), "%s", thermal_monitor_buf);
+}
+
+static ssize_t
+thermal_monitor_store(struct kobject *kobj, struct kobj_attribute *attr,
+		      const char *buf, size_t n)
+{
+	strncpy(thermal_monitor_buf, buf, sizeof(thermal_monitor_buf) - 1);
+	thermal_monitor_buf[sizeof(thermal_monitor_buf) - 1] = '\0';
+	kobject_uevent_env(kobj, KOBJ_CHANGE, thermal_monitor_change);
+	pr_info("thermal-monitor uevent notify.\n");
+	return n;
+}
+thermal_attr(thermal_monitor);
 
 static struct attribute * g[] = {
 	&state_attr.attr,
@@ -596,6 +719,9 @@ static struct attribute * g[] = {
 	&autosleep_attr.attr,
 #endif
 #ifdef CONFIG_PM_WAKELOCKS
+#ifdef CONFIG_PM_DEBUG
+	&wakelock_debug_attr.attr,
+#endif 
 	&wake_lock_attr.attr,
 	&wake_unlock_attr.attr,
 #endif
@@ -609,6 +735,11 @@ static struct attribute * g[] = {
 #ifdef CONFIG_FREEZER
 	&pm_freeze_timeout_attr.attr,
 #endif
+#ifdef CONFIG_HTC_PNPMGR
+	&powersave_attr.attr,
+#endif
+	&thermal_monitor_attr.attr,
+	&ktop_accu_attr.attr,
 	NULL,
 };
 

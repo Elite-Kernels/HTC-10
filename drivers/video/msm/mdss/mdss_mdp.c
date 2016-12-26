@@ -599,7 +599,7 @@ struct reg_bus_client *mdss_reg_bus_vote_client_create(char *client_name)
 	strlcpy(client->name, client_name, MAX_CLIENT_NAME_LEN);
 	client->usecase_ndx = VOTE_INDEX_DISABLE;
 	client->id = id;
-	pr_debug("bus vote client %s created:%p id :%d\n", client_name,
+	pr_debug("bus vote client %s created:%pK id :%d\n", client_name,
 		client, id);
 	id++;
 	list_add(&client->list, &mdss_res->reg_bus_clist);
@@ -613,7 +613,7 @@ void mdss_reg_bus_vote_client_destroy(struct reg_bus_client *client)
 	if (!client) {
 		pr_err("reg bus vote: invalid client handle\n");
 	} else {
-		pr_debug("bus vote client %s destroyed:%p id:%u\n",
+		pr_debug("bus vote client %s destroyed:%pK id:%u\n",
 			client->name, client, client->id);
 		mutex_lock(&mdss_res->reg_bus_lock);
 		list_del_init(&client->list);
@@ -782,7 +782,7 @@ void mdss_mdp_irq_clear(struct mdss_data_type *mdata,
 
 int mdss_mdp_irq_enable(u32 intr_type, u32 intf_num)
 {
-	int irq_idx, idx;
+	int irq_idx;
 	unsigned long irq_flags;
 	int ret = 0;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
@@ -801,7 +801,7 @@ int mdss_mdp_irq_enable(u32 intr_type, u32 intf_num)
 	spin_lock_irqsave(&mdp_lock, irq_flags);
 	if (mdata->mdp_irq_mask[irq.reg_idx] & irq.irq_mask) {
 		pr_warn("MDSS MDP IRQ-0x%x is already set, mask=%x\n",
-				irq.irq_mask, mdata->mdp_irq_mask[idx]);
+				irq.irq_mask, mdata->mdp_irq_mask[irq.reg_idx]);
 		ret = -EBUSY;
 	} else {
 		pr_debug("MDP IRQ mask old=%x new=%x\n",
@@ -1980,7 +1980,7 @@ static u32 mdss_mdp_res_init(struct mdss_data_type *mdata)
 
 	mdata->iclient = msm_ion_client_create(mdata->pdev->name);
 	if (IS_ERR_OR_NULL(mdata->iclient)) {
-		pr_err("msm_ion_client_create() return error (%p)\n",
+		pr_err("msm_ion_client_create() return error (%pK)\n",
 				mdata->iclient);
 		mdata->iclient = NULL;
 	}
@@ -2592,7 +2592,7 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 	if (rc)
 		pr_debug("unable to map MDSS VBIF non-realtime base\n");
 	else
-		pr_debug("MDSS VBIF NRT HW Base addr=%p len=0x%x\n",
+		pr_debug("MDSS VBIF NRT HW Base addr=%pK len=0x%x\n",
 			mdata->vbif_nrt_io.base, mdata->vbif_nrt_io.len);
 
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
@@ -3195,21 +3195,21 @@ static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev)
 			&mdata->rgb_pipes, mdata->nrgb_pipes,
 			mdata->nvig_pipes);
 	if (IS_ERR_VALUE(rc))
-		goto parse_fail;
+		goto rgb_alloc_fail;
 	mdata->nrgb_pipes = rc;
 
 	rc = mdss_mdp_parse_dt_pipe_helper(pdev, MDSS_MDP_PIPE_TYPE_DMA, "dma",
 			&mdata->dma_pipes, mdata->ndma_pipes,
 			mdata->nvig_pipes + mdata->nrgb_pipes);
 	if (IS_ERR_VALUE(rc))
-		goto parse_fail;
+		goto dma_alloc_fail;
 	mdata->ndma_pipes = rc;
 
 	rc = mdss_mdp_parse_dt_pipe_helper(pdev, MDSS_MDP_PIPE_TYPE_CURSOR,
 			"cursor", &mdata->cursor_pipes, mdata->ncursor_pipes,
 			0);
 	if (IS_ERR_VALUE(rc))
-		goto parse_fail;
+		goto cursor_alloc_fail;
 	mdata->ncursor_pipes = rc;
 
 	rc = 0;
@@ -3262,6 +3262,14 @@ static int mdss_mdp_parse_dt_pipe(struct platform_device *pdev)
 			data[0], data[1], data[2], data[3]);
 	}
 
+	return rc;
+
+cursor_alloc_fail:
+	devm_kfree(&pdev->dev, mdata->dma_pipes);
+dma_alloc_fail:
+	devm_kfree(&pdev->dev, mdata->rgb_pipes);
+rgb_alloc_fail:
+	devm_kfree(&pdev->dev, mdata->vig_pipes);
 parse_fail:
 	return rc;
 }
@@ -3414,7 +3422,7 @@ static int mdss_mdp_cdm_addr_setup(struct mdss_data_type *mdata,
 		atomic_set(&head[i].kref.refcount, 0);
 		mutex_init(&head[i].lock);
 		init_completion(&head[i].free_comp);
-		pr_debug("%s: cdm off (%d) = %p\n", __func__, i, head[i].base);
+		pr_debug("%s: cdm off (%d) = %pK\n", __func__, i, head[i].base);
 	}
 
 	mdata->cdm_off = head;
@@ -3481,7 +3489,7 @@ static int mdss_mdp_dsc_addr_setup(struct mdss_data_type *mdata,
 	for (i = 0; i < len; i++) {
 		head[i].num = i;
 		head[i].base = (mdata->mdss_io.base) + dsc_offsets[i];
-		pr_debug("dsc off (%d) = %p\n", i, head[i].base);
+		pr_debug("dsc off (%d) = %pK\n", i, head[i].base);
 	}
 
 	mdata->dsc_off = head;

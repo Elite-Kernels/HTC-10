@@ -479,6 +479,35 @@ Optional properites:
 - qcom,mdss-dsi-post-init-delay:        Specifies required number of frames to wait so that panel can be functional
 					to show proper display.
 
+- htc,brt-bl-table:			An array that specifies the backlight 1.0 bl and brightness
+					transform table.
+					Each set will have the format defined as below:
+					--> brightness level:[0,255]
+					--> bl level:(IC PWM)[0,255] or (PMIC WLED)[0,4095]
+- htc,mdss-camera-blk:		Specifies the brightness of camera
+
+- htc,cabc-ui-cmds:			A byte stream formed by multiple dcs packets base on
+					qcom dsi controller protocol.
+
+- htc,cabc-video-cmds:		A byte stream formed by multiple dcs packets base on
+					qcom dsi controller protocol.
+
+- htc,cabc-off-cmds:		A byte stream formed by multiple dcs packets base on
+					qcom dsi controller protocol.
+
+- htc,color-temp-cmds:		A node lists the color temperature setting that base on
+					qcom dsi controller protocol.
+- htc,color-default-cmds:	A byte stream formed by multiple dcs packets base on
+					qcom dsi controller protocol.
+- htc,color-srgb-cmds:		A byte stream formed by multiple dcs packets base on
+					qcom dsi controller protocol.
+- htc,burst-on-cmds:		A byte stream formed by multiple dcs packets base on
+					qcom dsi controller protocol.
+- htc,burst-off-cmds:		A byte stream formed by multiple dcs packets base on
+					qcom dsi controller protocol.
+- htc,burst-on-level		An integer value indicates the burst mode on level.
+- htc,burst-off-level		An integer value indicated the burst mode off level.
+
 Additional properties added to the second level nodes that represent timings properties:
 - qcom,mdss-dsi-timing-default:		Property that specifies the current child as the default
 					timing configuration that will be used.
@@ -489,6 +518,9 @@ Additional properties added to the second level nodes that represent timings pro
 					commands.
 					"dsi_lp_mode" = DSI low power mode (default)
 					"dsi_hs_mode" = DSI high speed mode
+
+- htc,dsi_panel_power_control:		String that specifies customized panel power control.
+					"hx8396c2" => Used for HX8396C workaround
 
 Note, if a given optional qcom,* binding is not present, then the driver will configure
 the default values specified.

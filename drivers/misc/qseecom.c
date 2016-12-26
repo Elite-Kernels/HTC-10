@@ -130,6 +130,7 @@ static dev_t qseecom_device_no;
 static DEFINE_MUTEX(qsee_bw_mutex);
 static DEFINE_MUTEX(app_access_lock);
 static DEFINE_MUTEX(clk_access_lock);
+static DEFINE_MUTEX(cmnlib_access_lock);
 
 struct qseecom_registered_listener_list {
 	struct list_head                 list;
@@ -2077,13 +2078,15 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 		return -EFAULT;
 	}
 
-	/* Check and load cmnlib */
+	
+	mutex_lock(&cmnlib_access_lock);
 	if (qseecom.qsee_version > QSEEE_VERSION_00) {
 		if (!qseecom.commonlib_loaded &&
 				load_img_req.app_arch == ELFCLASS32) {
 			ret = qseecom_load_commonlib_image(data, "cmnlib");
 			if (ret) {
 				pr_err("failed to load cmnlib\n");
+				mutex_unlock(&cmnlib_access_lock);
 				return -EIO;
 			}
 			qseecom.commonlib_loaded = true;
@@ -2095,12 +2098,14 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 			ret = qseecom_load_commonlib_image(data, "cmnlib64");
 			if (ret) {
 				pr_err("failed to load cmnlib64\n");
+				mutex_unlock(&cmnlib_access_lock);
 				return -EIO;
 			}
 			qseecom.commonlib64_loaded = true;
 			pr_debug("cmnlib64 is loaded\n");
 		}
 	}
+	mutex_unlock(&cmnlib_access_lock);
 
 	if (qseecom.support_bus_scaling) {
 		mutex_lock(&qsee_bw_mutex);
@@ -3322,6 +3327,7 @@ static int __qseecom_update_cmd_buf_64(void *msg, bool cleanup,
 				}
 			}
 			len = QSEECOM_SG_LIST_BUF_HDR_SZ_64BIT;
+			sg = sg_ptr->sgl;
 			goto cleanup;
 		}
 		sg = sg_ptr->sgl;
@@ -4088,12 +4094,21 @@ int qseecom_start_app(struct qseecom_handle **handle,
 	data->client.user_virt_sb_base = 0;
 	data->client.ihandle = NULL;
 
+	
+	data->sglistinfo_ptr = kzalloc(SGLISTINFO_TABLE_SIZE, GFP_KERNEL);
+	if (!(data->sglistinfo_ptr)) {
+		kfree(data);
+		kfree(*handle);
+		*handle = NULL;
+		return -ENOMEM;
+	}
 	init_waitqueue_head(&data->abort_wq);
 
 	data->client.ihandle = ion_alloc(qseecom.ion_clnt, size, 4096,
 				ION_HEAP(ION_QSECOM_HEAP_ID), 0);
 	if (IS_ERR_OR_NULL(data->client.ihandle)) {
 		pr_err("Ion client could not retrieve the handle\n");
+		kfree(data->sglistinfo_ptr);
 		kfree(data);
 		kfree(*handle);
 		*handle = NULL;
@@ -4191,6 +4206,7 @@ int qseecom_start_app(struct qseecom_handle **handle,
 	return 0;
 
 err:
+	kfree(data->sglistinfo_ptr);
 	kfree(data);
 	kfree(*handle);
 	*handle = NULL;
@@ -4238,6 +4254,7 @@ int qseecom_shutdown_app(struct qseecom_handle **handle)
 
 	mutex_unlock(&app_access_lock);
 	if (ret == 0) {
+		kzfree(data->sglistinfo_ptr);
 		kzfree(data);
 		kzfree(*handle);
 		kzfree(kclient);
