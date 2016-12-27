@@ -4192,8 +4192,8 @@ int sdhci_add_host(struct sdhci_host *host)
 			curr = host->ops->get_current_limit(host);
 
 		if (curr > 0) {
-			
-			curr = curr/1000;  
+			/* convert to SDHCI_MAX_CURRENT format */
+			curr = curr/1000;  /* convert to mA */
 			curr = curr/SDHCI_MAX_CURRENT_MULTIPLIER;
 
 			curr = min_t(u32, curr, SDHCI_MAX_CURRENT_LIMIT);
@@ -4275,6 +4275,11 @@ int sdhci_add_host(struct sdhci_host *host)
 			printk("%s %s alloc prev_sg err : %d\n", mmc_hostname(mmc), __func__, ret);
 	}
 
+	/*
+	 * Maximum number of sectors in one transfer. Limited by DMA boundary
+	 * size (512KiB), unless specified by platform specific driver. Each
+	 * descriptor can transfer a maximum of 64KB.
+	 */
 	if (host->flags & SDHCI_USE_ADMA)
 		mmc->max_req_size = (host->adma_max_desc * 65536);
 	else

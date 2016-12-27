@@ -1762,7 +1762,6 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				break;
 			/* FALLTHROUGH */
 		case USB_DT_CONFIG:
-			get_os_type(w_length);
 			spin_lock(&cdev->lock);
 			value = config_desc(cdev, w_value);
 			spin_unlock(&cdev->lock);

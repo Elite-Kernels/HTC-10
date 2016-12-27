@@ -46,11 +46,15 @@ Module.symvers
 /vmlinuz
 /System.map
 /Module.markers
+/Module.symvers
 
 #
 # Debian directory (make deb-pkg)
 #
 /debian/
+
+# GCC Out Directory 
+/out/
 
 #
 # git files that we don't want to ignore even it they are dot-files
@@ -62,6 +66,7 @@ Module.symvers
 # Generated include files
 #
 include/config
+include/linux/version.h
 include/generated
 arch/*/include/generated
 
@@ -82,8 +87,19 @@ GRTAGS
 GSYMS
 GTAGS
 
+# Keep build script out of the way
+build-anykernel.sh
+build-anykernel.cfg
+
 *.orig
 *~
+*.rej
+*.diff
+*.patch
+*.list
+out/*
+
+
 \#*#
 
 #

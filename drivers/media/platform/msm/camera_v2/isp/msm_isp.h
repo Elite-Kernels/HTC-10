@@ -398,6 +398,7 @@ enum msm_vfe_axi_stream_type {
 struct msm_vfe_frame_request_queue {
 	struct list_head list;
 	enum msm_vfe_buff_queue_id buff_queue_id;
+	uint32_t buf_index;
 	uint8_t cmd_used;
 };
 
@@ -771,7 +772,7 @@ struct vfe_device {
 	/* irq info */
 	uint32_t irq0_mask;
 	uint32_t irq1_mask;
-	
+	/* before halt irq info */
 	uint32_t recovery_irq0_mask;
 	uint32_t recovery_irq1_mask;
 };

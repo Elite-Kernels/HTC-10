@@ -1830,7 +1830,7 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned event,
 		break;
 	case DWC3_CONTROLLER_RESTART_USB_SESSION:
 		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_RESTART_USB_SESSION received\n");
-		dwc3_restart_usb_work(&mdwc->restart_usb_work);
+		schedule_work(&mdwc->restart_usb_work);
 		break;
 	case DWC3_CONTROLLER_NOTIFY_DISABLE_UPDXFER:
 		dwc3_msm_dbm_disable_updxfer(dwc, value);
@@ -1933,7 +1933,7 @@ static int dwc3_msm_prepare_suspend(struct dwc3_msm *mdwc)
 
 	if ((mdwc->in_host_mode || (mdwc->vbus_active
 			&& mdwc->otg_state == OTG_STATE_B_SUSPEND))
-			&& dwc3_msm_is_superspeed(mdwc)) {
+			&& dwc3_msm_is_superspeed(mdwc) && !mdwc->in_restart) {
 		if (!atomic_read(&mdwc->in_p3)) {
 			dev_err(mdwc->dev, "Not in P3,aborting LPM sequence\n");
 			return -EBUSY;
@@ -1963,7 +1963,7 @@ static int dwc3_msm_prepare_suspend(struct dwc3_msm *mdwc)
 			dwc3_msm_read_reg(mdwc->base, PWR_EVNT_IRQ_STAT_REG));
 		dbg_event(0xFF, "QUSB_STS",
 			dwc3_msm_read_reg(mdwc->base, QSCRATCH_USB30_STS_REG));
-		
+		/* Mark fatal error for host mode or USB bus suspend case */
 		if (mdwc->in_host_mode || (mdwc->vbus_active
 			&& mdwc->otg_state == OTG_STATE_B_SUSPEND)) {
 			queue_delayed_work(mdwc->dwc3_wq,

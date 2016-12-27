@@ -1312,7 +1312,7 @@ TRACE_EVENT(core_ctl_set_busy,
 		  __entry->is_busy)
 );
 
-#endif 
+#endif /* _TRACE_SCHED_H */
 
 /* This part must be outside protection */
 #include <trace/define_trace.h>
