@@ -3135,13 +3135,6 @@
 			qcom,dump-id = <0x23>;
 		};
 	};
-	htc_pnpmgr{
-		compatible = "htc,perf_table";
-		htc,cluster-map = <0x0c>, <0x03>;
-		htc,perf_table = <1036800>, <1036800>, <1036800>, <1036800>, <1036800>,
-			<1036800>, <1036800>, <1036800>, <1036800>, <1036800>;
-
-	};
 
 	qcom_tzlog: tz-log@66bf720 {
 		compatible = "qcom,tz-log";

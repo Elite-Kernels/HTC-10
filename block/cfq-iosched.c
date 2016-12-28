@@ -3456,20 +3456,6 @@ static void cfq_init_prio_data(struct cfq_queue *cfqq, struct cfq_io_cq *cic)
 	struct task_struct *tsk = current;
 	int ioprio_class;
 
-	if (launch_event_enabled)
-	{
-		int bg;
-		bg = (tsk->sched_task_group->shares < DEFAULT_CPU_SHARE)? 1 : 0;
-		if (bg) {
-			cfqq->ioprio_class = IOPRIO_CLASS_IDLE;
-			cfqq->ioprio = 7;
-			cfqq->org_ioprio = cfqq->ioprio;
-			cfq_clear_cfqq_idle_window(cfqq);
-			cfq_mark_cfqq_prio_changed(cfqq);
-			return;
-		}
-	}
-
 	if (!cfq_cfqq_prio_changed(cfqq))
 		return;
 
