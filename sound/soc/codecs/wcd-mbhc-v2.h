@@ -350,7 +350,7 @@ struct wcd_mbhc_cb {
 			    int num_btn, bool);
 	void (*hph_pull_up_control)(struct snd_soc_codec *,
 				    enum mbhc_hs_pullup_iref);
-	int (*mbhc_micbias_control)(struct snd_soc_codec *, int req);
+	int (*mbhc_micbias_control)(struct snd_soc_codec *, int, int req);
 	void (*mbhc_micb_ramp_control)(struct snd_soc_codec *, bool);
 	void (*skip_imped_detect)(struct snd_soc_codec *);
 	bool (*extn_use_mb)(struct snd_soc_codec *);
