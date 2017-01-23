@@ -253,3 +253,5 @@ ifeq ($(HTC_QTI_FINGERPRINT), 1)
     $(shell sed -i 's/CONFIG_MSM_QBT1000=n/CONFIG_MSM_QBT1000=y/g' kernel/arch/$(KERNEL_ARCH)/configs/$(KERNEL_DEFCONFIG))
     $(shell sed -i 's/CONFIG_EEPROM_AT24=n/CONFIG_EEPROM_AT24=y/g' kernel/arch/$(KERNEL_ARCH)/configs/$(KERNEL_DEFCONFIG))
 endif
+
+# NEBULA: Michael Harrell <eliminater74@gmail.com> (The Nebula Project: Project EAS: Started 01/23/2017)
