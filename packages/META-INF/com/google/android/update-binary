@@ -96,11 +96,11 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.scripts)" == 1 ]; then
   if [ -d "$system/su.d" ]
   then  
     cp -rf /tmp/anykernel/system/su.d/* /system/su.d/;
-    set_perm_recursive 0 0 0755 0755 /system/su.d;
+    chmod 0755 /system/su.d;
   else
     mkdir /system/su.d;
     cp -rf /tmp/anykernel/system/su.d/* /system/su.d/;
-    set_perm_recursive 0 0 0755 0755 /system/su.d;
+    chmod 0755 /system/su.d;
   fi;
 fi;
 
