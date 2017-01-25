@@ -1817,7 +1817,7 @@ static int dispatcher_do_fault(struct adreno_device *adreno_dev)
 		}
 	}
 
-	if (!adreno_cmdqueue_is_empty(dispatch_q)) {
+	if (dispatch_q && !adreno_cmdqueue_is_empty(dispatch_q)) {
 		cmdbatch = dispatch_q->cmd_q[dispatch_q->head];
 		fault_pid = cmdbatch->context->proc_priv->pid;
 		trace_adreno_cmdbatch_fault(cmdbatch, fault);
@@ -2131,12 +2131,17 @@ static void adreno_dispatcher_work(struct work_struct *work)
 
 	kgsl_process_event_groups(device);
 
+	/*
+	 * dispatcher_do_fault() returns 0 if no faults occurred. If that is the
+	 * case, then clean up preemption and try to schedule more work
+	 */
 	if (dispatcher_do_fault(adreno_dev) == 0) {
+
 		/* Clean up after preemption */
 		if (gpudev->preemption_schedule)
 			gpudev->preemption_schedule(adreno_dev);
 
-		
+		/* Run the scheduler for to dispatch new commands */
 		_adreno_dispatcher_issuecmds(adreno_dev);
 	}
 

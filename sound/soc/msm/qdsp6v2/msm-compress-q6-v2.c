@@ -75,6 +75,7 @@
 #define COMPR_PLAYBACK_MAX_FRAGMENT_SIZE (128 * 1024)
 #define COMPR_PLAYBACK_MIN_NUM_FRAGMENTS (4)
 #define COMPR_PLAYBACK_MAX_NUM_FRAGMENTS (16 * 4)
+#define COMPR_PLAYBACK_DSP_FRAGMENT_SIZE (32 * 1024)
 
 #define COMPRESSED_LR_VOL_MAX_STEPS	0x2000
 const DECLARE_TLV_DB_LINEAR(msm_compr_vol_gain, 0,
@@ -187,6 +188,11 @@ struct msm_compr_audio {
 	wait_queue_head_t drain_wait;
 	wait_queue_head_t close_wait;
 	wait_queue_head_t wait_for_stream_avail;
+
+	uint32_t dsp_fragment_size;
+	uint32_t dsp_fragments;
+	uint32_t dsp_fragment_ratio;
+	uint32_t dsp_fragments_sent;
 
 	spinlock_t lock;
 };
@@ -383,10 +389,22 @@ static int msm_compr_send_buffer(struct msm_compr_audio *prtd)
 				prtd->gapless_state.initial_samples_drop,
 				prtd->gapless_state.trailing_samples_drop);
 
-	buffer_length = prtd->codec_param.buffer.fragment_size;
 	bytes_available = prtd->bytes_received - prtd->copied_total;
-	if (bytes_available < prtd->codec_param.buffer.fragment_size)
+
+
+	if (bytes_available < prtd->dsp_fragment_size)
 		buffer_length = bytes_available;
+	else if (bytes_available > prtd->cstream->runtime->fragment_size)
+		buffer_length = prtd->cstream->runtime->fragment_size;
+	else {
+		/*
+		 * do_div divides in place and bytes_available is modified
+		 * to the quotient after the division. Essentially, write
+		 * the remaining data in dsp_fragment_size'd chunks
+		 */
+		do_div(bytes_available, prtd->dsp_fragment_size);
+		buffer_length = bytes_available * prtd->dsp_fragment_size;
+	}
 
 	if (prtd->byte_offset + buffer_length > prtd->buffer_size) {
 		buffer_length = (prtd->buffer_size - prtd->byte_offset);
@@ -476,7 +494,11 @@ static void compr_event_handler(uint32_t opcode,
 		if (prtd->byte_offset >= prtd->buffer_size)
 			prtd->byte_offset -= prtd->buffer_size;
 
-		snd_compr_fragment_elapsed(cstream);
+		prtd->dsp_fragments_sent += token / prtd->dsp_fragment_size;
+		if (prtd->dsp_fragments_sent >= prtd->dsp_fragment_ratio) {
+			snd_compr_fragment_elapsed(cstream);
+			prtd->dsp_fragments_sent = 0;
+		}
 
 		if (!atomic_read(&prtd->start)) {
 			/* Writes must be restarted from _copy() */
@@ -491,7 +513,7 @@ static void compr_event_handler(uint32_t opcode,
 		}
 
 		bytes_available = prtd->bytes_received - prtd->copied_total;
-		if (bytes_available == 0) {
+		if (bytes_available < prtd->dsp_fragment_size) {
 			pr_debug("WRITE_DONE Insufficient data to send. break out\n");
 			atomic_set(&prtd->xrun, 1);
 
@@ -503,8 +525,8 @@ static void compr_event_handler(uint32_t opcode,
 				wake_up(&prtd->drain_wait);
 				atomic_set(&prtd->drain, 0);
 			}
-		} else if ((bytes_available <= cstream->runtime->fragment_size)
-			   && atomic_read(&prtd->drain)) {
+		} else if ((bytes_available == prtd->dsp_fragment_size)
+				 && atomic_read(&prtd->drain)) {
 			prtd->last_buffer = 1;
 			msm_compr_send_buffer(prtd);
 			
@@ -573,7 +595,7 @@ static void compr_event_handler(uint32_t opcode,
 			spin_lock_irqsave(&prtd->lock, flags);
 			if (!prtd->bytes_sent) {
 				bytes_available = prtd->bytes_received - prtd->copied_total;
-				if (bytes_available < cstream->runtime->fragment_size) {
+				if (bytes_available < prtd->dsp_fragment_size) {
 					pr_debug("CMD_RUN_V2 Insufficient data to send. break out\n");
 					atomic_set(&prtd->xrun, 1);
 				} else
@@ -1123,12 +1145,38 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 
 	runtime->fragments = prtd->codec_param.buffer.fragments;
 	runtime->fragment_size = prtd->codec_param.buffer.fragment_size;
+
+	/* use smaller DSP fragments to ease gapless transition by reducing the
+	 * minimum amount of data necessary to start DSP decoding
+	 */
+	if (runtime->fragment_size < COMPR_PLAYBACK_DSP_FRAGMENT_SIZE) {
+		prtd->dsp_fragment_size = runtime->fragment_size;
+	} else if ((runtime->fragment_size %
+			COMPR_PLAYBACK_DSP_FRAGMENT_SIZE) != 0) {
+		prtd->dsp_fragment_size = runtime->fragment_size;
+		pr_debug("%s: runtime fragment size %d is not a multiple of %d\n",
+				__func__, runtime->fragment_size,
+				COMPR_PLAYBACK_DSP_FRAGMENT_SIZE);
+	} else {
+		prtd->dsp_fragment_size = COMPR_PLAYBACK_DSP_FRAGMENT_SIZE;
+	}
+	prtd->dsp_fragment_ratio = runtime->fragment_size /
+					prtd->dsp_fragment_size;
+	prtd->dsp_fragments = runtime->fragments *
+					prtd->dsp_fragment_ratio;
+
+	if (prtd->dsp_fragments > COMPR_PLAYBACK_MAX_NUM_FRAGMENTS) {
+		pr_err("%s: Invalid fragment count: %d", __func__,
+				prtd->dsp_fragments);
+		return -EINVAL;
+	}
+
 	pr_debug("allocate %d buffers each of size %d\n",
 			runtime->fragments,
 			runtime->fragment_size);
 	ret = q6asm_audio_client_buf_alloc_contiguous(dir, ac,
-					runtime->fragment_size,
-					runtime->fragments);
+			prtd->dsp_fragment_size,
+			prtd->dsp_fragments);
 	if (ret < 0) {
 		pr_err("Audio Start: Buffer Allocation failed rc = %d\n", ret);
 #ifdef CONFIG_HTC_DEBUG_DSP
@@ -1142,6 +1190,7 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 	prtd->app_pointer  = 0;
 	prtd->bytes_received = 0;
 	prtd->bytes_sent = 0;
+	prtd->dsp_fragments_sent = 0;
 	prtd->buffer       = ac->port[dir].buf[0].data;
 	prtd->buffer_paddr = ac->port[dir].buf[0].phys;
 	prtd->buffer_size  = runtime->fragments * runtime->fragment_size;
@@ -1711,6 +1760,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		prtd->bytes_received = 0;
 		prtd->bytes_sent = 0;
 		prtd->marker_timestamp = 0;
+		prtd->dsp_fragments_sent = 0;
 
 		atomic_set(&prtd->xrun, 0);
 		atomic_set(&prtd->drain_done_pendding, 0); 
@@ -1792,8 +1842,8 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			 */
 			bytes_to_write = prtd->bytes_received
 						- prtd->copied_total;
-			WARN(bytes_to_write > runtime->fragment_size,
-			     "last write %d cannot be > than fragment_size",
+			WARN(bytes_to_write > prtd->dsp_fragment_size,
+			     "last write %d cannot be > than dsp_fragment_size",
 			     bytes_to_write);
 
 			if (bytes_to_write > 0) {
@@ -1876,7 +1926,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			if (atomic_read(&prtd->eos))
 				prtd->gapless_state.gapless_transition = 1;
 			prtd->marker_timestamp = 0;
-
+			prtd->dsp_fragments_sent = 0;
 			/*
 			Don't reset these as these vars map to
 			total_bytes_transferred and total_bytes_available
@@ -1973,6 +2023,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			prtd->app_pointer  = 0;
 			prtd->first_buffer = 1;
 			prtd->last_buffer = 0;
+			prtd->dsp_fragments_sent = 0;
 			atomic_set(&prtd->drain, 0);
 			atomic_set(&prtd->xrun, 1);
 			spin_unlock_irqrestore(&prtd->lock, flags);
@@ -2129,15 +2180,14 @@ static int msm_compr_pointer(struct snd_compr_stream *cstream,
 		pr_debug("%s session time in gapless transition",
 			 __func__);
 
+	/*
+	 - Do not query if no buffer has been given.
+	 - Do not query on a gapless transition.
+	   Playback for the 2nd stream can start (thus returning time
+	   starting from 0) before the driver knows about EOS of first stream.
+	*/
 
-#if 0
 	if (!first_buffer && !gapless_transition) {
-#else
-	if (stream_end) {
-		timestamp = lasttimestamp;
-	} else if (!first_buffer && !gapless_transition) {
-#endif
-
 		if (pdata->use_legacy_api)
 			rc = q6asm_get_session_time_legacy(prtd->audio_client,
 						&prtd->marker_timestamp);
@@ -2154,13 +2204,7 @@ static int msm_compr_pointer(struct snd_compr_stream *cstream,
 				return -EAGAIN;
 		}
 	}
-#if 0
 	timestamp = prtd->marker_timestamp;
-#else
-	if (!stream_end) {
-		timestamp = prtd->marker_timestamp;
-	}
-#endif
 
 	/* DSP returns timestamp in usec */
 	pr_debug("%s: timestamp = %lld usec\n", __func__, timestamp);
@@ -2259,7 +2303,8 @@ static int msm_compr_copy(struct snd_compr_stream *cstream,
 
 	/*
 	 * If stream is started and there has been an xrun,
-	 * since the available bytes fits fragment_size, copy the data right away
+	 * since the available bytes fits dsp_fragment_size,
+	 * copy the data right away
 	 */
 	spin_lock_irqsave(&prtd->lock, flags);
 	prtd->bytes_received += count;
@@ -2267,11 +2312,7 @@ static int msm_compr_copy(struct snd_compr_stream *cstream,
 		if (atomic_read(&prtd->xrun)) {
 			pr_debug("%s: in xrun, count = %zd\n", __func__, count);
 			bytes_available = prtd->bytes_received - prtd->copied_total;
-			if (bytes_available >= runtime->fragment_size) {
-				if (prtd->stream_end){
-					pr_debug("reset lasttimestamp at msm_compr_send_buffer\n");
-					prtd->stream_end = false;
-				}
+			if (bytes_available >= prtd->dsp_fragment_size) {
 				pr_debug("%s: handle xrun, bytes_to_write = %llu\n",
 					 __func__,
 					 bytes_available);

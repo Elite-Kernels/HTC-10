@@ -22,8 +22,8 @@
 #include "soc/qcom/msm-core.h"
 
 #define MAX_PSTATES 50
-#define NUM_OF_PENTRY 3 
-#define NUM_OF_EENTRY 2 
+#define NUM_OF_PENTRY 3 /* number of variables for ptable node */
+#define NUM_OF_EENTRY 2 /* number of variables for enable node */
 
 enum arg_offset {
 	CPU_OFFSET,

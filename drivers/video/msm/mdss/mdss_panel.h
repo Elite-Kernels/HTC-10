@@ -55,6 +55,9 @@ struct panel_id {
 
 #define DSC_PPS_LEN		128
 
+/* HDR propeties count */
+#define DISPLAY_PRIMARIES_COUNT	8	/* WRGB x and y values*/
+
 static inline const char *mdss_panel2str(u32 panel)
 {
 	static const char const *names[] = {
@@ -104,12 +107,6 @@ enum {
 	MDSS_PANEL_POWER_ON,
 	MDSS_PANEL_POWER_LP1,
 	MDSS_PANEL_POWER_LP2,
-};
-
-enum {
-	MDSS_PANEL_BLANK_BLANK = 0,
-	MDSS_PANEL_BLANK_UNBLANK,
-	MDSS_PANEL_BLANK_LOW_POWER,
 };
 
 enum {
@@ -164,7 +161,7 @@ enum {
 };
 
 struct mdss_intf_recovery {
-	void (*fxn)(void *ctx, int event);
+	int (*fxn)(void *ctx, int event);
 	void *data;
 };
 
@@ -599,6 +596,20 @@ struct htc_backlight1_table {
 enum {
 	PANEL_POWER_CTRL_DEFAULT,
 	PANEL_POWER_CTRL_HX8396C2,
+
+};
+
+struct mdss_panel_hdr_properties {
+	bool hdr_enabled;
+
+	/* WRGB X and y values arrayed in format */
+	/* [WX, WY, RX, RY, GX, GY, BX, BY] */
+	u32 display_primaries[DISPLAY_PRIMARIES_COUNT];
+
+	/* peak brightness supported by panel */
+	u32 peak_brightness;
+	/* Blackness level supported by panel */
+	u32 blackness_level;
 };
 
 struct mdss_panel_info {
@@ -734,11 +745,13 @@ struct mdss_panel_info {
 
 	/* debugfs structure for the panel */
 	struct mdss_panel_debugfs_info *debugfs_info;
-
 	
 	struct htc_backlight1_table brt_bl_table;
 	int camera_blk;
 	int power_ctrl;
+
+	/* HDR properties of display panel*/
+	struct mdss_panel_hdr_properties hdr_properties;
 };
 
 struct mdss_panel_timing {
