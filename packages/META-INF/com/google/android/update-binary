@@ -93,15 +93,6 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.scripts)" == 1 ]; then
   ui_print " ";
   rm /system/etc/init.d/92Elite;
   rm /system/su.d/Elite.sh;  
-  if [ -d "$system/su.d" ]
-  then  
-    cp -rf /tmp/anykernel/system/su.d/* /system/su.d/;
-    set_perm_recursive 0 0 0755 0755 /system/su.d;
-  else
-    mkdir /system/su.d;
-    cp -rf /tmp/anykernel/system/su.d/* /system/su.d/;
-    set_perm_recursive 0 0 0755 0755 /system/su.d;
-  fi;
 fi;
 
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.pnpmgr)" == 1 ]; then
@@ -150,7 +141,7 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.eas_support)" == 1 ]; then
 			chmod 0644 /system/lib/libcutils.so;
 			chmod 0644 /system/lib64/libcutils.so;
 			chmod 0755 /system/bin/init.foreground.sh;
-			chmod 0755 /system/etc/init.d/99schedboost;
+			chmod 0755 /system/su.d/Elite.sh;
 			mount -o remount,ro -t auto /system;		
 fi;
 
