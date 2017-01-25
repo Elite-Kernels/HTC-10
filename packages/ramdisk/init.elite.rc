@@ -1,0 +1,320 @@
+###################################################
+## init.nebula.rc file (C) 2016 By @Eliminater74 ##
+##                                               ##
+## Updated: 01/24/2017                           ##
+##                                               ##
+## Special Settings By: @Freak07                 ##
+##                                               ##
+###################################################
+
+on boot
+    write /dev/kmsg "[Nebula] Boot Started "
+		
+    # update cpusets now that processors are up
+    write /dev/cpuset/top-app/cpus 0-3
+    write /dev/cpuset/foreground/cpus 0-2
+    write /dev/cpuset/foreground/boost/cpus 0-2
+    write /dev/cpuset/background/cpus 0
+    write /dev/cpuset/system-background/cpus 0-1
+    # set default schedTune value for foreground/top-app (only affects EAS)
+    write /dev/stune/schedtune.boost 2
+    write /dev/stune/schedtune.prefer_idle 1
+    write /dev/stune/background/schedtune.prefer_idle 1
+    write /dev/stune/foreground/schedtune.prefer_idle 1
+    write /dev/stune/foreground/schedtune.boost 1
+    write /dev/stune/top-app/schedtune.boost 50
+    write /dev/stune/top-app/schedtune.prefer_idle 1
+
+    exec - root root system readproc -- /system/bin/init.foreground.sh
+	
+    # add a cpuset for the camera daemon
+    # we want all cores for camera
+    mkdir /dev/cpuset/camera-daemon
+    write /dev/cpuset/camera-daemon/cpus 0-3
+    write /dev/cpuset/camera-daemon/mems 0
+    chown system system /dev/cpuset/camera-daemon
+    chown system system /dev/cpuset/camera-daemon/tasks
+    chmod 0664 /dev/cpuset/camera-daemon/tasks
+	
+    write /proc/sys/kernel/sched_boost 1
+
+    # Set light thermal restrictions while optimizing apps
+    # [throttle_freq_LITTLE, throttle_freq_big, throttle_temp, unthrottle_temp]
+    # Set normal thermal restrictions
+    write /dev/kmsg "[Nebula] Simple_Thermal_Monitor Config: On-Boot: "
+    write /sys/kernel/msm_thermal/enabled 0
+    write /sys/kernel/msm_thermal/zone0 "1401600 1824000 46 43"
+    write /sys/kernel/msm_thermal/zone1 "1324800 1824000 49 46"
+    write /sys/kernel/msm_thermal/zone2 "1324800 1632000 52 49"
+    write /sys/kernel/msm_thermal/zone3 "1324800 1555200 54 52"
+    write /sys/kernel/msm_thermal/zone4 "1324800 1478400 56 54"
+    write /sys/kernel/msm_thermal/zone5 "1324800 1401600 58 56"
+    write /sys/kernel/msm_thermal/zone6 "1324800 1324800 60 58"
+    write /sys/kernel/msm_thermal/zone7 "1190400 1248000 63 60"
+    write /sys/kernel/msm_thermal/zone8 "1036000 1036000 70 63"
+    write /sys/kernel/msm_thermal/sampling_ms 8000
+    write /sys/kernel/msm_thermal/enabled 1
+    
+    
+on enable-low-power
+    write /dev/kmsg "[Nebula] Enabled-low-power mod: "
+	
+    # Enable Adaptive LMK
+    write /sys/module/lowmemorykiller/parameters/enable_adaptive_lmk 1
+    write /sys/module/lowmemorykiller/parameters/vmpressure_file_min 81250
+    
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 1593600
+    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq 2150400
+
+    # Configure governor settings for little cluster
+#    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "interactive"
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/use_sched_load 1
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/use_migration_notif 1
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/above_hispeed_delay 19000
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/go_hispeed_load 70
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/timer_rate 20000
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/hispeed_freq 1190400
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/io_is_busy 1
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/target_loads "85 1100000:35 1200000:49 1300000:71 1400000:95"
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/min_sample_time 40000
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/max_freq_hysteresis 100000
+#    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 307200
+#    write /sys/devices/system/cpu/cpu0/cpufreq/interactive/ignore_hispeed_on_notif 1##
+
+    # Online CPU2
+#    write /sys/devices/system/cpu/cpu2/online 1
+
+    # Configure governor settings for big cluster
+#    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "interactive"
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/use_sched_load 1
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/use_migration_notif 1
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/above_hispeed_delay 19000
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/go_hispeed_load 70
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/timer_rate 20000
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/hispeed_freq 1036800
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/io_is_busy 1
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/target_loads "89 1400000:35 1600000:49 1800000:71 1900000:95"
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/min_sample_time 40000
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/max_freq_hysteresis 100000
+#    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq 307200
+#    write /sys/devices/system/cpu/cpu2/cpufreq/interactive/ignore_hispeed_on_notif 1    
+#    
+#    # Apply settings to LITTLE cluster
+		# Temporarily change permissions to governor files for the LITTLE cluster to enable Interactive governor
+		chmod 644 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+		write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "interactive"
+		chmod 444 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+		#Temporarily change permissions to governor files for the LITTLE cluster to lower the maximum frequency to 1996MHz
+		chmod 644 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+		#Core 0 Maximum Frequency = 1996MHz	
+		write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 1593600	
+		chmod 444 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+		#Tweak Interactive Governor
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/target_loads "60 460800:75 614400:77 844800:80 1132800:85 1286400:87 1440000:90 1593600:92 1824000:95 1996800:100"
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/timer_slack "-1"
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/hispeed_freq 614400
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/timer_rate 28000
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/above_hispeed_delay 33000
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/go_hispeed_load 99
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/min_sample_time 40000
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/max_freq_hysteresis 0
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/ignore_hispeed_on_notif 0
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/boost 0
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/fast_ramp_down 0
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/align_windows 0
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/use_migration_notif 1
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/use_sched_load 0
+		write /sys/devices/system/cpu/cpu0/cpufreq/interactive/boostpulse_duration 0
+    
+    # Apply settings to Big cluster
+    # Temporarily change permissions to governor files for the Big cluster to enable Interactive governor
+#		chmod 644 /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor
+		write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "interactive"
+#		chmod 444 /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor
+		# Temporarily change permissions to governor files for the Big cluster to raise minimum frequency to 480MHz
+#		chmod 644 /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq
+		# Core 2 Minimum Frequency = 480MHz
+#		write /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq 480000		
+#		chmod 444 /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq
+			# Online Core 2
+		write /sys/devices/system/cpu/cpu2/online 1 		
+    
+#    chmod 644 /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq
+     # Core 4 Maximum Frequency = 2342MHz	
+		write /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq 2150400
+#    chmod 444 /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq 
+		# Set overclock max frequency compatible target_loads	
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/target_loads "72 460800:65 614400:73 825600:64 979200:98 1132800:68 1286400:72 1593600:80 1824000:85 1977600:85 2150400:92 2246400:95 2342400:100"
+    
+    #Tweak Interactive Governor
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/timer_slack "-1"
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/hispeed_freq 979200
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/timer_rate 8000
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/above_hispeed_delay "20000 1344000:10000"
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/go_hispeed_load 80
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/min_sample_time 30000
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/max_freq_hysteresis 20000
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/ignore_hispeed_on_notif 0
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/boost 0
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/fast_ramp_down 0
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/align_windows 0
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/use_migration_notif 1
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/use_sched_load 0
+		write /sys/devices/system/cpu/cpu2/cpufreq/interactive/boostpulse_duration 0
+    	
+  # Graphics Settings. Make sure we start at 624mhz(Default)  
+  	write /dev/kmsg "[Nebula] GPU: set default freq level of 624mhz: "	
+    write /sys/class/kgsl/kgsl-3d/max_gpuclk 624000000
+    write /sys/class/devfreq/b00000.qcom,kgsl-3d0/max_freq 624000000
+    write /sys/class/devfreq/b00000.qcom,kgsl-3d0/min_freq 133000000
+#   write /sys/class/devfreq/b00000.qcom,kgsl-3d0/
+#   write /sys/class/devfreq/b00000.qcom,kgsl-3d0/
+
+on property:sys.boot_completed=1
+    write /dev/kmsg "[Nebula] Boot Completed "
+
+    write /proc/sys/kernel/sched_boost 0
+    # update cpusets now that boot is complete and we want better load balancing
+    write /dev/cpuset/top-app/cpus 0-3
+    write /dev/cpuset/foreground/boost/cpus 0-2 
+    write /dev/cpuset/foreground/cpus 0-2
+    write /dev/cpuset/background/cpus 0
+    write /dev/cpuset/system-background/cpus 0-2
+
+
+  # Input boost configuration
+    write /dev/kmsg "[Nebula] cpu_input_boost Settings: "
+    write /sys/kernel/cpu_input_boost/ib_freqs "1190400 1190400"
+    write /sys/kernel/cpu_input_boost/ib_duration_ms 500
+    write /sys/kernel/cpu_input_boost/enabled 0
+    
+    # Set normal thermal restrictions
+    write /dev/kmsg "[Nebula] simple_thermal_monitor Settings: "
+    write /sys/kernel/msm_thermal/enabled 0
+    write /sys/kernel/msm_thermal/zone0 "1401600 1824000 46 43"
+    write /sys/kernel/msm_thermal/zone1 "1324800 1824000 49 46"
+    write /sys/kernel/msm_thermal/zone2 "1324800 1632000 52 49"
+    write /sys/kernel/msm_thermal/zone3 "1324800 1555200 54 52"
+    write /sys/kernel/msm_thermal/zone4 "1324800 1478400 56 54"
+    write /sys/kernel/msm_thermal/zone5 "1324800 1401600 58 56"
+    write /sys/kernel/msm_thermal/zone6 "1324800 1324800 60 58"
+    write /sys/kernel/msm_thermal/zone7 "1190400 1248000 63 60"
+    write /sys/kernel/msm_thermal/zone8 "1036000 1036000 70 63"
+    write /sys/kernel/msm_thermal/sampling_ms 8000
+    write /sys/kernel/msm_thermal/enabled 1
+	
+	write /proc/sys/kernel/sched_child_runs_first 0
+	write /proc/sys/kernel/sched_cstate_aware 1
+	write /proc/sys/kernel/sched_initial_task_util 0
+	write /proc/sys/kernel/sched_is_big_little 1
+	write /proc/sys/kernel/sched_latency_ns 10000000
+	write /proc/sys/kernel/sched_migration_cost_ns 500000
+	write /proc/sys/kernel/sched_min_granularity_ns 900000
+	write /proc/sys/kernel/sched_nr_migrate 16
+	write /proc/sys/kernel/sched_rr_timeslice_ms 10
+	write /proc/sys/kernel/sched_rt_period_us 1000000
+	write /proc/sys/kernel/sched_rt_runtime_us 950000
+	write /proc/sys/kernel/sched_shares_window_ns 10000000
+	write /proc/sys/kernel/sched_sync_hint_enable 1
+	write /proc/sys/kernel/sched_time_avg_ms 1000
+	write /proc/sys/kernel/sched_tunable_scaling 0
+	write /proc/sys/kernel/sched_use_walt_cpu_util 1
+	write /proc/sys/kernel/sched_use_walt_task_util 1
+	write /proc/sys/kernel/sched_wakeup_granularity_ns 100000
+	write /proc/sys/kernel/sched_walt_cpu_high_irqload 10000000
+	write /proc/sys/kernel/sched_walt_init_task_load_pct 10
+	write /proc/sys/kernel/sched_autogroup_enabled 1
+	
+	chown system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+	chown system /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor
+	# if EAS is present, switch to sched governor (no effect if not EAS)
+	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "sched"
+	write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "sched"
+	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "sched"
+	write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "sched"
+	
+	
+on property:sys.boot_completed=1
+    trigger enable-low-power
+
+on property:init.svc.recovery=running
+    trigger enable-low-power
+    
+on property:sys.perf.profile=0
+    write /dev/kmsg "[Nebula] sys.perf.profile=0 "
+	
+    # Set low-power performance settings
+    write /sys/kernel/msm_thermal/user_maxfreq 1036800
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "conservative"
+    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "conservative"
+
+    write /sys/class/devfreq/soc:qcom,cpubw/governor "powersave"
+    write /sys/class/kgsl/kgsl-3d0/devfreq/governor "powersave"
+
+    # Set normal thermal restrictions
+    write /sys/kernel/msm_thermal/enabled 0
+    write /sys/kernel/msm_thermal/zone0 "1401600 1785600 40 38"
+    write /sys/kernel/msm_thermal/zone1 "1324800 1555200 41 40"
+    write /sys/kernel/msm_thermal/zone2 "1228800 1478400 42 41"
+    write /sys/kernel/msm_thermal/zone3 "1228800 1401600 43 42"
+    write /sys/kernel/msm_thermal/zone4 "1190400 1324800 44 43"
+    write /sys/kernel/msm_thermal/zone5 "1190400 1248000 46 44"
+    write /sys/kernel/msm_thermal/zone6 "1113600 1190400 48 46"
+    write /sys/kernel/msm_thermal/zone7 "1036800 940800 53 50"
+    write /sys/kernel/msm_thermal/zone8 "729600 729600 65 60"
+    write /sys/kernel/msm_thermal/sampling_ms 8000
+    write /sys/kernel/msm_thermal/enabled 1
+
+on property:sys.perf.profile=1
+     write /dev/kmsg "[Nebula] sys.perf.profile=1 "
+	
+#    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 1593600
+#    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq 2150400
+    
+    # Set normal performance settings
+    write /sys/kernel/msm_thermal/user_maxfreq 0
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "sched"
+    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "sched"
+
+    write /sys/class/devfreq/soc:qcom,cpubw/governor "bw_hwmon"
+    write /sys/class/kgsl/kgsl-3d0/devfreq/governor "msm-adreno-tz"
+
+    # Set normal thermal restrictions
+    write /sys/kernel/msm_thermal/enabled 0
+    write /sys/kernel/msm_thermal/zone0 "1401600 1824000 46 43"
+    write /sys/kernel/msm_thermal/zone1 "1324800 1824000 49 46"
+    write /sys/kernel/msm_thermal/zone2 "1324800 1632000 52 49"
+    write /sys/kernel/msm_thermal/zone3 "1324800 1555200 54 52"
+    write /sys/kernel/msm_thermal/zone4 "1324800 1478400 56 54"
+    write /sys/kernel/msm_thermal/zone5 "1324800 1401600 58 56"
+    write /sys/kernel/msm_thermal/zone6 "1324800 1324800 60 58"
+    write /sys/kernel/msm_thermal/zone7 "1190400 1248000 63 60"
+    write /sys/kernel/msm_thermal/zone8 "1036000 1036000 70 63"
+    write /sys/kernel/msm_thermal/sampling_ms 8000
+    write /sys/kernel/msm_thermal/enabled 1
+
+on property:sys.perf.profile=2
+		write /dev/kmsg "[Nebula] sys.perf.profile=2 "
+	
+    # Set high performance settings
+    # Keep little cluster at maxfreq
+    write /sys/kernel/msm_thermal/user_maxfreq 0
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "performance"
+    write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "interactive"
+
+    write /sys/class/devfreq/soc:qcom,cpubw/governor "performance"
+    write /sys/class/kgsl/kgsl-3d0/devfreq/governor "performance"
+
+    # Set light thermal restrictions for performance mode
+    write /sys/kernel/msm_thermal/enabled 0
+    write /sys/kernel/msm_thermal/zone0 "1401600 1785600 46 44"
+    write /sys/kernel/msm_thermal/zone1 "1324800 1555200 47 46"
+    write /sys/kernel/msm_thermal/zone2 "1228800 1478400 48 47"
+    write /sys/kernel/msm_thermal/zone3 "1228800 1401600 49 48"
+    write /sys/kernel/msm_thermal/zone4 "1190400 1324800 50 49"
+    write /sys/kernel/msm_thermal/zone5 "1190400 1248000 52 50"
+    write /sys/kernel/msm_thermal/zone6 "1113600 1190400 54 52"
+    write /sys/kernel/msm_thermal/zone7 "1036800 940800 59 50"
+    write /sys/kernel/msm_thermal/zone8 "729600 729600 70 65"
+    write /sys/kernel/msm_thermal/sampling_ms 1000
+    write /sys/kernel/msm_thermal/enabled 1

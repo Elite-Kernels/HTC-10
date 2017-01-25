@@ -9,9 +9,13 @@ do.initd=1
 do.system=0
 do.scripts=1
 do.cleanup=0
+do.pnpmgr=1
+do.eas_support=1
 device.name1=htc_pmewl
 device.name2=htc_pmeuhl
 device.name3=htc_pmewhl
+device.name4=htc10
+device.name5=htc
 
 # shell variables
 block=/dev/block/platform/soc/7464900.sdhci/by-name/boot;
@@ -103,14 +107,25 @@ replace_string() {
 
 # replace_section <file> <begin search string> <end search string> <replacement string>
 replace_section() {
-  line=`grep -n "$2" $1 | cut -d: -f1`;
-  sed -i "/${2}/,/${3}/d" $1;
-  sed -i "${line}s;^;${4}\n;" $1;
+  begin=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
+  for end in `grep -n "$3" $1 | cut -d: -f1`; do
+    if [ "$begin" -lt "$end" ]; then
+      sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
+      sed -i "${begin}s;^;${4}\n;" $1;
+      break;
+    fi;
+  done;
 }
 
 # remove_section <file> <begin search string> <end search string>
 remove_section() {
-  sed -i "/${2}/,/${3}/d" $1;
+  begin=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
+  for end in `grep -n "$3" $1 | cut -d: -f1`; do
+    if [ "$begin" -lt "$end" ]; then
+      sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
+      break;
+    fi;
+  done;
 }
 
 # insert_line <file> <if search string> <before|after> <line match string> <inserted line>
@@ -120,15 +135,19 @@ insert_line() {
       before) offset=0;;
       after) offset=1;;
     esac;
-    line=$((`grep -n "$4" $1 | cut -d: -f1` + offset));
-    sed -i "${line}s;^;${5}\n;" $1;
+    line=$((`grep -n "$4" $1 | head -n1 | cut -d: -f1` + offset));
+    if [ "$(wc -l $1 | cut -d\  -f1)" -le "$line" ]; then
+      echo "$5" >> $1;
+    else
+      sed -i "${line}s;^;${5}\n;" $1;
+    fi;
   fi;
 }
 
 # replace_line <file> <line replace string> <replacement line>
 replace_line() {
   if [ ! -z "$(grep "$2" $1)" ]; then
-    line=`grep -n "$2" $1 | cut -d: -f1`;
+    line=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
     sed -i "${line}s;.*;${3};" $1;
   fi;
 }
@@ -136,7 +155,7 @@ replace_line() {
 # remove_line <file> <line match string>
 remove_line() {
   if [ ! -z "$(grep "$2" $1)" ]; then
-    line=`grep -n "$2" $1 | cut -d: -f1`;
+    line=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
     sed -i "${line}d" $1;
   fi;
 }
@@ -155,7 +174,7 @@ insert_file() {
       before) offset=0;;
       after) offset=1;;
     esac;
-    line=$((`grep -n "$4" $1 | cut -d: -f1` + offset));
+    line=$((`grep -n "$4" $1 | head -n1 | cut -d: -f1` + offset));
     sed -i "${line}s;^;\n;" $1;
     sed -i "$((line - 1))r $patch/$5" $1;
   fi;
@@ -209,17 +228,36 @@ dump_boot;
 
 # begin ramdisk changes
 
-# default.prop
-# backup_file default.prop;
-#replace_line default.prop "ro.adb.secure=0" "ro.adb.secure=1";
-#replace_line default.prop "ro.adb.secure=1" "ro.adb.secure=1";
-#replace_line default.prop "ro.secure=0" "ro.secure=1";
-#replace_line default.prop "ro.secure=1" "ro.secure=1";
-#append_file default.prop ro.adb.secure=1 default
+insert_line init.rc "import /init.elite.rc" after "import /init.power.rc" "import /init.elite.rc";
+insert_line init.rc "    seclabel u:r:init:s0" after "service usbdiag_init  /system/bin/sh /init.usbdiag.sh" "    seclabel u:r:init:s0"
+insert_line init.rc "    mkdir /dev/stune/background" after "    mount cgroup none /dev/stune schedtune" "    mkdir /dev/stune/background"
+insert_line init.rc "    mkdir /dev/stune/top-app" after "    mkdir /dev/stune/foreground" "    mkdir /dev/stune/top-app"
+insert_line init.rc "    chown system system /dev/stune/background" after "    chown system system /dev/stune" "    chown system system /dev/stune/background"
+insert_line init.rc "    chown system system /dev/stune/top-app" after "    chown system system /dev/stune/foreground" "    chown system system /dev/stune/top-app"
+insert_line init.rc "    chown system system /dev/stune/background/tasks" after "    chown system system /dev/stune/tasks" "    chown system system /dev/stune/background/tasks"
+insert_line init.rc "    chown system system /dev/stune/top-app/tasks" after "    chown system system /dev/stune/foreground/tasks" "    chown system system /dev/stune/top-app/tasks"
+insert_line init.rc "    chmod 0664 /dev/stune/background/tasks" after "    chmod 0664 /dev/stune/tasks" "    chmod 0664 /dev/stune/background/tasks"
+insert_line init.rc "    chmod 0664 /dev/stune/top-app/tasks" after "    chmod 0664 /dev/stune/foreground/tasks" "    chmod 0664 /dev/stune/top-app/tasks"
+insert_line init.rc "    seclabel u:r:init:s0" after "service network_init  /system/bin/sh /init.network.sh" "    seclabel u:r:init:s0"
+insert_line init.rc "    mkdir" after "    mkdir" "    mkdir"
+insert_line init.power.rc "    seclabel u:r:init:s0" after "service setfps /system/bin/sh /system/etc/setfps.sh" "    seclabel u:r:init:s0"
+insert_line init.power.rc "    seclabel u:r:init:s0" after "service setFOTA /system/bin/sh /system/etc/setFOTAfreq.sh" "    seclabel u:r:init:s0"
+insert_line init.rc "    mkdir" after "    mkdir" "    mkdir"
+insert_line init.rc "    mkdir" after "    mkdir" "    mkdir"
 
-# init.rc
-# backup_file init.rc;
-#append_file init.qcom.rc "/system/elite/Elite.sh" init;
+backup_file init.power.rc
+remove_section init.power.rc "#CPUSET" "top-app/cpus";
+remove_section init.power.rc "# init PnPMgr node" "200";
+remove_section init.power.rc "property:init.svc.thermal-engine=stopped" "/sys/power/pnpmgr/cluster/little/cpu3/thermal_freq";
+remove_section init.power.rc "service pnpmgr" "root";
+remove_section init.power.rc "thermal-engine=stopped" "little/cpu3/thermal_freq"
+remove_section init.rc "# Reload policy from /data/security if present." "setprop selinux.reload_policy 1"
+
+replace_line init.zygote64_32.rc "    writepid /dev/cpuset/foreground/tasks /sys/fs/cgroup/stune/foreground/tasks" "    writepid /dev/cpuset/foreground/tasks /dev/stune/foreground/tasks"
+#insert_line init.zygote64_32.rc "    priority -20" after "    class main" "    priority -20"
+#insert_line init.zygote64_32.rc "    priority -20" before "    socket zygote_secondary stream 660 root system" "    priority -20"
+replace_line init.zygote32.rc "    writepid /dev/cpuset/foreground/tasks /dev/stune/foreground/tasks" "    writepid /dev/cpuset/foreground/tasks"
+#insert_line init.zygote32.rc "    priority -20" after "    class main" "    priority -20"
 
 # end ramdisk changes
 
