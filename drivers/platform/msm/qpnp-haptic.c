@@ -1303,6 +1303,7 @@ static ssize_t qpnp_hap_voltage_level_store(struct device *dev,
 
 	input = simple_strtoul(buf, NULL, 10);
 	hap->vmax_mv = input;
+	hap->short_vmax = input;
 
 	rc = qpnp_hap_vmax_config(hap);
 	if (rc < 0)
@@ -1723,6 +1724,8 @@ static int qpnp_hap_set(struct qpnp_hap *hap, int on)
 	return rc;
 }
 
+extern void register_haptic(int value);
+
 /* enable interface from timed output class */
 static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 {
@@ -1746,6 +1749,9 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 		hap->state = 0;
 	} else {
 		VIB_INFO_LOG("en=%d\n", value);
+#if 1
+		register_haptic(value);
+#endif
 		value = (value > hap->timeout_ms ?
 				 hap->timeout_ms : value);
 		if(hap->soft_mode_enable) {
@@ -1753,6 +1759,12 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 			if((hap->last_set != current_set) || (hap->last_set == SPMI_WRITE_FAIL))
 				qpnp_hap_switch(current_set);
 		}
+
+		if (hap->vmax_mv == QPNP_HAP_VMAX_MIN_MV) {
+			spin_unlock(&hap->lock);
+			return;
+		}
+
 		hap->state = 1;
 		hrtimer_start(&hap->hap_timer,
 			      ktime_set(value / 1000, (value % 1000) * 1000000),

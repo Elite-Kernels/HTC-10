@@ -22,6 +22,7 @@
 #include <linux/notifier.h>
 #include <linux/irqreturn.h>
 #include <linux/kref.h>
+#include <linux/kthread.h>
 
 #include "mdss.h"
 #include "mdss_mdp_hwio.h"
@@ -839,6 +840,10 @@ struct mdss_overlay_private {
 	void *splash_mem_vaddr;
 	dma_addr_t splash_mem_dma;
 	u8 sd_transition_state;
+
+	struct kthread_worker worker;
+	struct kthread_work vsync_work;
+	struct task_struct *thread;
 };
 
 struct mdss_mdp_set_ot_params {

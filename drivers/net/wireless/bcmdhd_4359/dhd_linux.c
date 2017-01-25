@@ -211,6 +211,12 @@ static u32 vendor_oui = CONFIG_DHD_SET_RANDOM_MAC_VAL;
 #endif
 
 #include <wl_android.h>
+#include <linux/moduleparam.h>
+
+static int wlrx_divide = 1;
+static int wlctrl_divide = 1;
+module_param(wlrx_divide, int, 0644);
+module_param(wlctrl_divide, int, 0644);
 
 #define DHD_MAX_STA     32
 
@@ -11246,12 +11252,14 @@ int dhd_os_send_hang_message(dhd_pub_t *dhdp)
 		DHD_OS_WAKE_LOCK(dhdp);
 
 		DHD_GENERAL_LOCK(dhdp, flags);
+#ifdef DHD_FW_COREDUMP
 		if (dhdp->memdump_in_progress) {
 			DHD_ERROR(("%s: memdump in progress, sending hang later.\n", __FUNCTION__));
 			dhdp->memdump_with_hang_pending = 1;
 			DHD_GENERAL_UNLOCK(dhdp, flags);
 			return ret;
 		}
+#endif
 		if (dhdp->busstate == DHD_BUS_DATA) {
 			disable_intr = true;
 		}
@@ -11855,7 +11863,7 @@ write_to_file(dhd_pub_t *dhd, uint8 *buf, int size)
 	fp->f_op->write(fp, buf, size, &pos);
 
 #if defined(CUSTOMER_HW_ONE) && defined(CONFIG_DHD_USE_STATIC_BUF) && \
-	defined(DHD_USE_STATIC_MEMDUMP)
+	defined(DHD_USE_STATIC_MEMDUMP) && defined(DHD_FW_COREDUMP)
 	fp->f_op->fsync(fp, 0, MAX_BUFF_SIZE-1, 1);
 #endif 
 
@@ -11903,10 +11911,10 @@ int dhd_os_wake_lock_timeout(dhd_pub_t *pub)
 #ifdef CONFIG_HAS_WAKELOCK
 		if (dhd->wakelock_rx_timeout_enable)
 			wake_lock_timeout(&dhd->wl_rxwake,
-				msecs_to_jiffies(dhd->wakelock_rx_timeout_enable));
+				msecs_to_jiffies(dhd->wakelock_rx_timeout_enable)/wlrx_divide);
 		if (dhd->wakelock_ctrl_timeout_enable)
 			wake_lock_timeout(&dhd->wl_ctrlwake,
-				msecs_to_jiffies(dhd->wakelock_ctrl_timeout_enable));
+				msecs_to_jiffies(dhd->wakelock_ctrl_timeout_enable)/wlctrl_divide);
 #endif
 		dhd->wakelock_rx_timeout_enable = 0;
 		dhd->wakelock_ctrl_timeout_enable = 0;
