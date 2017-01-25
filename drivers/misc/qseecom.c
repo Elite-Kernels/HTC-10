@@ -274,6 +274,20 @@ struct sglist_info {
 	uint32_t sizeOrCount;
 };
 
+/*
+ * The 31th bit indicates only one or multiple physical address inside
+ * the request buffer. If it is set,  the index locates a single physical addr
+ * inside the request buffer, and `sizeOrCount` is the size of the memory being
+ * shared at that physical address.
+ * Otherwise, the index locates an array of {start, len} pairs (a
+ * "scatter/gather list"), and `sizeOrCount` gives the number of entries in
+ * that array.
+ *
+ * The 30th bit indicates 64 or 32bit address; when it is set, physical addr
+ * and scatter gather entry sizes are 64-bit values.  Otherwise, 32-bit values.
+ *
+ * The bits [0:29] of `indexAndFlags` hold an offset into the request buffer.
+ */
 #define SGLISTINFO_SET_INDEX_FLAG(c, s, i)	\
 	((uint32_t)(((c & 1) << 31) | ((s & 1) << 30) | (i & 0x3fffffff)))
 
@@ -3168,7 +3182,7 @@ static int __qseecom_update_cmd_buf(void *msg, bool cleanup,
 				data->sglist_cnt = i + 1;
 			}
 		}
-		
+		/* Deallocate the handle */
 		if (!IS_ERR_OR_NULL(ihandle))
 			ion_free(qseecom.ion_clnt, ihandle);
 	}
@@ -3386,7 +3400,7 @@ cleanup:
 				data->sglist_cnt = i + 1;
 			}
 		}
-		
+		/* Deallocate the handle */
 		if (!IS_ERR_OR_NULL(ihandle))
 			ion_free(qseecom.ion_clnt, ihandle);
 	}
@@ -6072,7 +6086,7 @@ clean:
 				sg->length : sg_ptr->nents;
 			data->sglist_cnt = i + 1;
 		}
-		
+		/* Deallocate the handle */
 		if (!IS_ERR_OR_NULL(ihandle))
 			ion_free(qseecom.ion_clnt, ihandle);
 	}
@@ -6305,7 +6319,7 @@ static int qseecom_qteec_invoke_modfd_cmd(struct qseecom_dev_handle *data,
 		return -ENOENT;
 	}
 
-	
+	/* validate offsets */
 	for (i = 0; i < MAX_ION_FD; i++) {
 		if (req.ifd_data[i].fd) {
 			if (req.ifd_data[i].cmd_buf_offset >= req.req_len)
@@ -7934,6 +7948,10 @@ out:
 	return ret;
 }
 
+/*
+ * Check if whitelist feature is supported by making a test scm_call
+ * to send a whitelist command to an invalid app ID 0
+ */
 static int qseecom_check_whitelist_feature(void)
 {
 	struct qseecom_client_send_data_ireq send_data_req = {0};
@@ -7978,6 +7996,11 @@ static int qseecom_check_whitelist_feature(void)
 	ret = qseecom_scm_call(SCM_SVC_TZSCHEDULER, 1,
 				cmd_buf, cmd_len,
 				&resp, sizeof(resp));
+/*
+ * If this cmd exists and whitelist is supported, scm_call return -2 (scm
+ * driver remap it to -EINVAL) and resp.result 0xFFFFFFED(-19); Otherwise,
+ * scm_call return -1 (remap to -EIO).
+ */
 	if (ret == -EIO) {
 		qseecom.whitelist_support = false;
 		ret = 0;
