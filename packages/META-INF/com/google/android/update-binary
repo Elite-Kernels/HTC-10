@@ -104,6 +104,56 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.scripts)" == 1 ]; then
   fi;
 fi;
 
+if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.pnpmgr)" == 1 ]; then
+ 	 		ui_print "[PNPMGR] Rename for backup...";
+  		ui_print " ";
+ 		 	mount -o remount,rw -t auto /system;
+  			if [ -e /system/bin/pnpmgr ]; then
+  				mv /system/bin/pnpmgr /system/bin/pnpmgr.bak;
+  				ui_print "[PNPMGR] Renamed system/bin/pnpmgr";
+  			else
+  				ui_print "[PNPMGR] pnpmgr: Already Backed up..";
+  			fi;  	
+  			if [ -e /system/etc/pnp.xml ]; then
+  				mv /system/etc/pnp.xml /system/etc/pnp.xml.bak;
+  				ui_print "[PNPMGR] Renamed system/bin/pnp.xml";
+  			else
+  				ui_print "[PNPMGR] pnp.xml: Already Backed up..";
+  			fi;
+  		mount -o remount,ro -t auto /system;
+fi;
+
+if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.pnpmgr)" == 2 ]; then
+ 	 		ui_print "[PNPMGR] Fix For Standard Edition..";
+  		ui_print " ";
+ 		 	mount -o remount,rw -t auto /system;
+  			if [ -e /system/bin/pnpmgr.bak ]; then
+  				mv /system/bin/pnpmgr.bak /system/bin/pnpmgr;
+  				ui_print "[PNPMGR] Renamed system/bin/pnpmgr.bak";
+  			else
+  				ui_print "[PNPMGR] pnpmgr: Already Fixed..";
+  			fi;  	
+  			if [ -e /system/etc/pnp.xml.bak ]; then
+  				mv /system/etc/pnp.xml.bak /system/etc/pnp.xml;
+  				ui_print "[PNPMGR] Renamed system/bin/pnp.xml.bak";
+  			else
+  				ui_print "[PNPMGR] pnp.xml: Already Fixed..";
+  			fi;
+  		mount -o remount,ro -t auto /system;
+fi;
+
+if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.eas_support)" == 1 ]; then
+		ui_print "Installing EAS ROM Support...";
+			ui_print " ";
+			mount -o remount,rw -t auto /system;
+			cp -rf /tmp/anykernel/system/* /system/;
+			chmod 0644 /system/lib/libcutils.so;
+			chmod 0644 /system/lib64/libcutils.so;
+			chmod 0755 /system/bin/init.foreground.sh;
+			chmod 0755 /system/etc/init.d/99schedboost;
+			mount -o remount,ro -t auto /system;		
+fi;
+
 sleep 0.25;
 ui_print "Installing kernel...";
 for i in $($bb --list); do
