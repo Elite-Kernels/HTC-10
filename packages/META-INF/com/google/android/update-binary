@@ -137,6 +137,10 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.eas_support)" == 1 ]; then
 		ui_print "Installing EAS ROM Support...";
 			ui_print " ";
 			mount -o remount,rw -t auto /system;
+			if [ -e /system/etc/init.qcom.post_boot.sh ]; then
+				ui_print "[EAS] Disable: init.qcom.post_boot.sh ";
+				mv /system/etc/init.qcom.post_boot.sh init.qcom.post_boot.sh.bak;
+			fi
 			cp -rf /tmp/anykernel/system/* /system/;
 			chmod 0644 /system/lib/libcutils.so;
 			chmod 0644 /system/lib64/libcutils.so;
