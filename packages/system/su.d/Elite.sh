@@ -86,6 +86,8 @@ echo 2 > /dev/stune/schedtune.boost #global CFS boost
 echo 2 > /dev/stune/background/schedtune.boost #background cpuset CFS boost
 echo 2 > /dev/stune/foreground/schedtune.boost #foreground cpuset CFS boost
 echo 4 > /dev/stune/top-app/schedtune.boost #top-app cpuset CFS boost
+echo "sched" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 
+echo "sched" > /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor
 
 chmod 644 /sys/block/mmcblk0/queue/scheduler
 chmod 644 /sys/block/mmcblk0/queue/read_ahead_kb
