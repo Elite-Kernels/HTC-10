@@ -82,9 +82,9 @@ echo "1" > /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost
  echo 8 > /sys/module/bcmdhd/parameters/wlctrl_divide
 
 #EAS Schedtune 
-echo 0 > /dev/stune/schedtune.boost #global CFS boost
-echo 0 > /dev/stune/background/schedtune.boost #background cpuset CFS boost
-echo 0 > /dev/stune/foreground/schedtune.boost #foreground cpuset CFS boost
+echo 2 > /dev/stune/schedtune.boost #global CFS boost
+echo 2 > /dev/stune/background/schedtune.boost #background cpuset CFS boost
+echo 2 > /dev/stune/foreground/schedtune.boost #foreground cpuset CFS boost
 echo 4 > /dev/stune/top-app/schedtune.boost #top-app cpuset CFS boost
 
 chmod 644 /sys/block/mmcblk0/queue/scheduler
