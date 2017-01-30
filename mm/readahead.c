@@ -192,6 +192,11 @@ int __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 		ret++;
 	}
 
+	/*
+	 * Now start the IO.  We ignore I/O errors - if the page is not
+	 * uptodate then the caller will launch readpage again, and
+	 * will then handle the error.
+	 */
 	if (ret) {
 		if (filp) {
 			char pathname[256], *path;

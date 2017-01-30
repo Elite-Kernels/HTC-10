@@ -510,7 +510,7 @@ wakelock_debug_store(struct kobject *kobj, struct kobj_attribute *attr,
         return n;
 }
 wakelock_debug_attr(wakelock_debug);
-#endif 
+#endif //CONFIG_PM_DEBUG
 
 static ssize_t wake_lock_show(struct kobject *kobj,
 			      struct kobj_attribute *attr,
@@ -623,7 +623,7 @@ static ssize_t pm_freeze_timeout_store(struct kobject *kobj,
 
 power_attr(pm_freeze_timeout);
 
-#endif	
+#endif	/* CONFIG_FREEZER*/
 
 #ifdef CONFIG_HTC_PNPMGR
 int powersave_enabled = 0;
@@ -717,7 +717,7 @@ static struct attribute * g[] = {
 #ifdef CONFIG_PM_WAKELOCKS
 #ifdef CONFIG_PM_DEBUG
 	&wakelock_debug_attr.attr,
-#endif 
+#endif //CONFIG_PM_DEBUG
 	&wake_lock_attr.attr,
 	&wake_unlock_attr.attr,
 #endif

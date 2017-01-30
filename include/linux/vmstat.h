@@ -89,7 +89,7 @@ static void vm_event_report_meminfo(struct seq_file *m)
 {
 }
 
-#endif 
+#endif /* CONFIG_VM_EVENT_COUNTERS */
 
 #ifdef CONFIG_NUMA_BALANCING
 #define count_vm_numa_event(x)     count_vm_event(x)

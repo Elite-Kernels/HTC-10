@@ -995,7 +995,7 @@ void extract_dci_pkt_rsp(unsigned char *buf, int len, int data_source,
 	}
 
 	save_req_uid = req_entry->uid;
-	
+	/* Remove the headers and send only the response to this function */
 	ret = diag_dci_remove_req_entry(temp, rsp_len, req_entry);
 	delete_flag = ret;
 	if (ret < 0) {
@@ -1953,7 +1953,7 @@ int diag_process_dci_transaction(unsigned char *buf, int len)
 			return -ENOMEM;
 		}
 		DIAG_DBUG("diag: head of dci log mask %pK\n", head_log_mask_ptr);
-		count = 0; 
+		count = 0; /* iterator for extracting log codes */
 
 		while (count < num_codes) {
 			if (read_len >= USER_SPACE_DATA) {
@@ -2067,7 +2067,7 @@ int diag_process_dci_transaction(unsigned char *buf, int len)
 			return -ENOMEM;
 		}
 		DIAG_DBUG("diag: head of dci event mask %pK\n", event_mask_ptr);
-		count = 0; 
+		count = 0; /* iterator for extracting log codes */
 		while (count < num_codes) {
 			if (read_len >= USER_SPACE_DATA) {
 				pr_err("diag: dci: Invalid length for event type in %s",

@@ -1658,7 +1658,7 @@ static int hdmi_tx_read_edid(struct hdmi_tx_ctrl *hdmi_ctrl)
 			total_blocks = cea_blks + 1;
 		}
 
-		
+		/* HTC: make sure DDC line via downstream device was released */
 		if (hdmi_ctrl->ds_data.ds_registered)
 			mdelay(2);
 	} while ((cea_blks-- > 0) && (block++ < MAX_EDID_BLOCKS));
@@ -3111,7 +3111,7 @@ static void hdmi_tx_hpd_off(struct hdmi_tx_ctrl *hdmi_ctrl)
 
 	cancel_delayed_work_sync(&hdmi_ctrl->hdcp_cb_work);
 
-	
+	/* Turn off HPD interrupts */
 	DSS_REG_W(io, HDMI_HPD_INT_CTRL, 0);
 
 
@@ -3135,7 +3135,7 @@ static void hdmi_tx_hpd_off(struct hdmi_tx_ctrl *hdmi_ctrl)
 	hdmi_ctrl->hpd_off_pending = false;
 
 	DEV_INFO("%s: HPD is now OFF\n", __func__);
-} 
+} /* hdmi_tx_hpd_off */
 
 static int hdmi_tx_hpd_on(struct hdmi_tx_ctrl *hdmi_ctrl)
 {

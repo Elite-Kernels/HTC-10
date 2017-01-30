@@ -3703,6 +3703,24 @@ SYSCALL_DEFINE1(rmdir, const char __user *, pathname)
 }
 
 extern atomic_t em_remount;
+/**
+ * vfs_unlink - unlink a filesystem object
+ * @dir:	parent directory
+ * @dentry:	victim
+ * @delegated_inode: returns victim inode, if the inode is delegated.
+ *
+ * The caller must hold dir->i_mutex.
+ *
+ * If vfs_unlink discovers a delegation, it will return -EWOULDBLOCK and
+ * return a reference to the inode in delegated_inode.  The caller
+ * should then break the delegation on that inode and retry.  Because
+ * breaking a delegation may take a long time, the caller should drop
+ * dir->i_mutex before doing so.
+ *
+ * Alternatively, a caller may pass NULL for delegated_inode.  This may
+ * be appropriate for callers that expect the underlying filesystem not
+ * to be NFS exported.
+ */
 int vfs_unlink(struct inode *dir, struct dentry *dentry, struct inode **delegated_inode)
 {
 	struct inode *target = dentry->d_inode;
@@ -4148,6 +4166,10 @@ int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		return -EROFS;
 	}
 
+	/*
+	 * If we are going to change the parent - check write permissions,
+	 * we'll need to flip '..'.
+	 */
 	if (new_dir != old_dir) {
 		if (is_dir) {
 			error = inode_permission(source, MAY_WRITE);

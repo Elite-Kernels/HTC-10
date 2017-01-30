@@ -490,7 +490,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		}
 
 #ifdef CONFIG_LMK_ZYGOTE_PROTECT
-		
+		//zygote protection
 		if (!strncmp("main",p->comm,4) && p->parent->pid == 1 ) {
 			if (oom_score_adj != OOM_SCORE_ADJ_MIN) {
 				lowmem_print(2, "select but ignore '%s' (%d), oom_score_adj %d, oom_adj %d, size %d, to kill with invalid adj values\n" \
@@ -499,7 +499,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 					other_file * (long)(PAGE_SIZE / 1024),
 					minfree * (long)(PAGE_SIZE / 1024));
 
-				
+				//reset oom_score_adj to OOM_SCORE_ADJ_MIN
 				task_lock(p);
 				p->signal->oom_score_adj = OOM_SCORE_ADJ_MIN;
 				task_unlock(p);
@@ -580,7 +580,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 					global_page_state(NR_MLOCK),
 					total_swapcache_pages());
 
-		
+		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 		trace_almk_shrink(selected_tasksize, ret,
 			other_free, other_file, selected_oom_score_adj);

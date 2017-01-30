@@ -43,7 +43,7 @@
 #include <asm/unistd.h>
 #include <asm/siginfo.h>
 #include <asm/cacheflush.h>
-#include "audit.h"	
+#include "audit.h"	/* audit_signal_info() */
 #include <htc_debug/stability/htc_process_debug.h>
 
 /*

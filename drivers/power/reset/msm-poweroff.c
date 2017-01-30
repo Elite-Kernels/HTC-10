@@ -275,6 +275,12 @@ static void msm_flush_console(void)
 	local_irq_restore(flags);
 }
 
+/*
+ * Force the SPMI PMIC arbiter to shutdown so that no more SPMI transactions
+ * are sent from the MSM to the PMIC.  This is required in order to avoid an
+ * SPMI lockup on certain PMIC chips if PS_HOLD is lowered in the middle of
+ * an SPMI transaction.
+ */
 static void halt_spmi_pmic_arbiter(void)
 {
 	struct scm_desc desc = {
@@ -303,7 +309,7 @@ static enum pon_power_off_type htc_restart_cmd_to_type(const char* cmd)
         } cmd_type[] = {
                 {"power-key-force-hard", PON_POWER_OFF_WARM_RESET},
                 {"force-dog-bark", PON_POWER_OFF_WARM_RESET},
-                        
+                        /* OEM RIL fatal: oem-95, 96, 98, 99 */
                 {"oem-93", PON_POWER_OFF_WARM_RESET},
                 {"oem-94", PON_POWER_OFF_WARM_RESET},
                 {"oem-95", PON_POWER_OFF_WARM_RESET},
@@ -325,7 +331,7 @@ static enum pon_power_off_type htc_restart_cmd_to_type(const char* cmd)
                 if (!strncmp(cmd, cmd_type[i].cmd, strlen(cmd_type[i].cmd)))
                         return cmd_type[i].type;
 
-        return PON_POWER_OFF_HARD_RESET; 
+        return PON_POWER_OFF_HARD_RESET; /* default reset type */
  }
 
 static void msm_restart_prepare(char mode, const char *cmd)
@@ -366,7 +372,7 @@ static void msm_restart_prepare(char mode, const char *cmd)
 	}
 
 	if (in_panic) {
-		
+		/* KP, do not overwrite the restart reason */
 	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(

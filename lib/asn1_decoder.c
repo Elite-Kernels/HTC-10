@@ -70,7 +70,7 @@ next_tag:
 	/* Extract a tag from the data */
 	tag = data[dp++];
 	if (tag == ASN1_EOC) {
-		
+		/* It appears to be an EOC. */
 		if (data[dp++] != 0)
 			goto invalid_eoc;
 		if (--indef_level <= 0) {
@@ -209,7 +209,7 @@ next_op:
 	if (op <= ASN1_OP__MATCHES_TAG) {
 		unsigned char tmp;
 
-		
+		/* Skip conditional matches if possible */
                if ((op & ASN1_OP_MATCH__COND && flags & FLAG_MATCHED) ||
                    (op & ASN1_OP_MATCH__SKIP && dp == datalen)) {
 			pc += asn1_op_lengths[op];

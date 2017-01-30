@@ -28,13 +28,15 @@
  *	and FCS/CRC (frame check sequence).
  */
 
-#define ETH_ALEN	6		
-#define ETH_HLEN	14		
-#define ETH_ZLEN	60		
-#define ETH_DATA_LEN	1500		
-#define ETH_FRAME_LEN	1514		
-#define ETH_FRAME_LEN_MAX	9014	
-#define ETH_FCS_LEN	4		
+#define ETH_ALEN	6		/* Octets in one ethernet addr	 */
+#define ETH_HLEN	14		/* Total octets in header.	 */
+#define ETH_ZLEN	60		/* Min. octets in frame sans FCS */
+#define ETH_DATA_LEN	1500		/* Max. octets in payload	 */
+#define ETH_FRAME_LEN	1514		/* Max. octets in frame sans FCS */
+/*++ 2015/12/25, USB Team, PCN00051 ++*/
+#define ETH_FRAME_LEN_MAX	9014	/* For CDC/NCM */
+/*-- 2015/12/25, USB Team, PCN00051 --*/
+#define ETH_FCS_LEN	4		/* Octets in the FCS		 */
 
 /*
  *	These are the defined Ethernet Protocol ID's.

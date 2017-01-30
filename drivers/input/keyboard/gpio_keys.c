@@ -36,8 +36,8 @@
 #include <linux/syscore_ops.h>
 
 enum {
-	DEBOUNCE_WAIT_IRQ,	
-	DEBOUNCE_UNSTABLE_IRQ,	
+	DEBOUNCE_WAIT_IRQ,	/* Stable irq state */
+	DEBOUNCE_UNSTABLE_IRQ,	/* Got irq while debouncing */
 	DEBOUNCE_UNKNOWN_STATE,
 	DEBOUNCE_CHECKING_STATE,
 	DEBOUNCE_DONE,
@@ -1053,7 +1053,7 @@ static int gpio_keys_probe(struct platform_device *pdev)
 			goto err_pinctrl;
 	}
 
-	
+	/* Link /sys/keyboard to platform device */
 	error = sysfs_create_link(NULL, &pdev->dev.kobj, "keyboard");
 	if (error) {
 		KEY_LOGE("KEY_ERR: %s: subsystem_register failed\n", __func__);
@@ -1091,7 +1091,7 @@ err_pinctrl:
 
 	   platform_set_drvdata(pdev, NULL);
 
-	   
+	   /* If we have no platform data, we allocated pdata dynamically. */
 	   if (!dev_get_platdata(&pdev->dev))
 		   kfree(pdata);
 err_setup_key:

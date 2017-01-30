@@ -860,10 +860,10 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 		if (vbif_version == VBIF_VERSION_2_3_0)
 			cpp_dev->hw_info.cpp_hw_version = CPP_HW_VERSION_4_0_0;
 	}
-	
-	
-	
-	
+	//HTC_START
+	//remove log
+	//pr_info("CPP HW Version: 0x%x\n", cpp_dev->hw_info.cpp_hw_version);
+	//HTC_END
 	cpp_dev->hw_info.cpp_hw_caps =
 		msm_camera_io_r(cpp_dev->cpp_hw_base + 0x4);
 
@@ -881,10 +881,10 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 			__func__, rc);
 		goto pwr_collapse_reset;
 	}
-	
-	
-	
-	
+	//HTC_START
+	//remove log
+	//pr_err("stream_cnt:%d\n", cpp_dev->stream_cnt);
+	//HTC_END
 	cpp_dev->stream_cnt = 0;
 	if (cpp_dev->fw_name_bin) {
 		msm_camera_enable_irq(cpp_dev->irq, false);

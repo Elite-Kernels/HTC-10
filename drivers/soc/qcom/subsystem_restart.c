@@ -97,6 +97,9 @@ static const char * const restart_levels[] = {
 };
 
 #if defined(CONFIG_HTC_DEBUG_SSR)
+/**
+ * MSS restart reason feature (Non-block)
+ */
 
 #define SUBSYS_NAME_MAX_LENGTH 40
 #define RD_BUF_SIZE			  256
@@ -119,7 +122,7 @@ static ssize_t subsystem_restart_reason_nonblock_show(struct kobject *kobj,
 
 	for( i=0; i<MODEM_ERRMSG_LIST_LEN; i++ ) {
 		if( msr_info_list[i].valid != 0 ) {
-			
+			//Copy errmsg to buf
 			snprintf(tmp, RD_BUF_SIZE+30, "%ld-%s|\n\r", msr_info_list[i].msr_time.tv_sec, msr_info_list[i].modem_errmsg);
 			strcat(buf, tmp);
 			memset(tmp, 0, RD_BUF_SIZE+30);
@@ -167,6 +170,17 @@ static struct attribute_group attr_group = {
 
 #endif
 
+/**
+ * struct subsys_tracking - track state of a subsystem or restart order
+ * @p_state: private state of subsystem/order
+ * @state: public state of subsystem/order
+ * @s_lock: protects p_state
+ * @lock: protects subsystem/order callbacks and state
+ *
+ * Tracks the state of a subsystem or a set of subsystems (restart order).
+ * Doing this avoids the need to grab each subsystem's lock and update
+ * each subsystems state when restarting an order.
+ */
 struct subsys_tracking {
 	enum p_subsys_state p_state;
 	spinlock_t s_lock;
@@ -352,7 +366,7 @@ void subsys_set_restart_reason(struct subsys_device *dev, const char* reason)
 	snprintf(dev->restart_reason, sizeof(dev->restart_reason) - 1, "%s", reason);
 }
 EXPORT_SYMBOL(subsys_set_restart_reason);
-#endif 
+#endif /* CONFIG_HTC_DEBUG_SSR */
 
 static ssize_t system_debug_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -820,10 +834,10 @@ static void enable_all_irqs(struct subsys_device *dev)
 		irq_set_irq_wake(dev->desc->generic_irq, 1);
 	}
 
-#if 1 
+#if 1 //Modem_BSP++
         if (dev->desc->reboot_req_irq)
                 enable_irq(dev->desc->reboot_req_irq);
-#endif 
+#endif //Modem_BSP--
 }
 
 static void disable_all_irqs(struct subsys_device *dev)
@@ -844,10 +858,10 @@ static void disable_all_irqs(struct subsys_device *dev)
 		irq_set_irq_wake(dev->desc->generic_irq, 0);
 	}
 
-#if 1 
+#if 1 //Modem_BSP++
         if (dev->desc->reboot_req_irq)
                 disable_irq(dev->desc->reboot_req_irq);
-#endif 
+#endif //Modem_BSP--
 }
 
 static int wait_for_err_ready(struct subsys_device *subsys)
@@ -1250,7 +1264,7 @@ static void __subsystem_restart_dev(struct subsys_device *dev)
 	unsigned long flags;
 
 #if defined(CONFIG_HTC_DEBUG_SSR)
-		
+		/*+SSD-RIL for nonblock restart reason	*/
 		if (!strncmp(name, "modem",
 					SUBSYS_NAME_MAX_LENGTH)) {
 		  msr_info_list[msm_msr_index].valid = 1;
@@ -1260,7 +1274,7 @@ static void __subsystem_restart_dev(struct subsys_device *dev)
 		  if(++msm_msr_index >= MODEM_ERRMSG_LIST_LEN)
 		    msm_msr_index = 0;
 		}
-	   
+	   /*-SSD-RIL for nonblock restart reason	*/
 #endif
 
 	pr_info("Restarting %s [level=%s]!\n", desc->name,
@@ -1797,12 +1811,12 @@ static int subsys_parse_devicetree(struct subsys_desc *desc)
 	if (ret && ret != -ENOENT)
 		return ret;
 
-#if 1 
+#if 1 //Modem_BSP++
 	ret = __get_irq(desc, "qcom,gpio-reboot-req", &desc->reboot_req_irq,
 							NULL);
 	if (ret && ret != -ENOENT)
 		return ret;
-#endif 
+#endif //Modem_BSP--
 
 	ret = __get_gpio(desc, "qcom,gpio-force-stop", &desc->force_stop_gpio);
 	if (ret && ret != -ENOENT)
@@ -1860,7 +1874,7 @@ static int subsys_setup_irqs(struct subsys_device *subsys)
 		disable_irq(desc->err_fatal_irq);
 	}
 
-#if 1 
+#if 1 //Modem_BSP++
 	if (desc->reboot_req_irq) {
 		ret = devm_request_irq(desc->dev, desc->reboot_req_irq,
 				desc->reboot_req_handler,
@@ -1872,7 +1886,7 @@ static int subsys_setup_irqs(struct subsys_device *subsys)
 		}
 		disable_irq(desc->reboot_req_irq);
 	}
-#endif 
+#endif //Modem_BSP--
 
 	if (desc->stop_ack_irq && desc->stop_ack_handler) {
 		ret = devm_request_irq(desc->dev, desc->stop_ack_irq,
@@ -1935,10 +1949,10 @@ static void subsys_free_irqs(struct subsys_device *subsys)
 	if (desc->err_fatal_irq && desc->err_fatal_handler)
 		devm_free_irq(desc->dev, desc->err_fatal_irq, desc);
 
-#if 1 
+#if 1 //Modem_BSP++
 	if (desc->reboot_req_irq)
 		devm_free_irq(desc->dev, desc->reboot_req_irq, desc);
-#endif 
+#endif //Modem_BSP--
 	
 	if (desc->stop_ack_irq && desc->stop_ack_handler)
 		devm_free_irq(desc->dev, desc->stop_ack_irq, desc);
@@ -2131,7 +2145,7 @@ static int __init subsys_restart_init(void)
 	int ret;
 #if defined(CONFIG_HTC_DEBUG_SSR)
 		struct kobject *properties_kobj;
-		
+		/*+SSD-RIL for nonblock restart reason	*/
 		subsystem_restart_reason_nonblock_init();
 		properties_kobj = kobject_create_and_add("subsystem_restart_properties", NULL);
 		if (properties_kobj) {
@@ -2141,7 +2155,7 @@ static int __init subsys_restart_init(void)
 				return ret;
 			}
 		}
-		
+		/*-SSD-RIL for nonblock restart reason	*/
 #endif
 	ssr_wq = alloc_workqueue("ssr_wq", WQ_CPU_INTENSIVE, 0);
 	BUG_ON(!ssr_wq);

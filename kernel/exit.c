@@ -899,7 +899,7 @@ do_group_exit(int exit_code)
 {
 	struct signal_struct *sig = current->signal;
 
-	BUG_ON(exit_code & 0x80); 
+	BUG_ON(exit_code & 0x80); /* core dumps don't get here */
 #ifdef CONFIG_HTC_PROCESS_DEBUG
 	do_group_exit_debug_dump(exit_code);
 #endif

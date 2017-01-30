@@ -189,17 +189,23 @@ struct flash_regulator_data {
 	u32			max_volt_uv;
 };
 
+/*
+ * flashlight_brightness_attribute_definition: the definition of flashlight "brightness" attribute
+ */
 
 enum flashlight_brightness_attribute_definition
-{ 
+{ /* range: [0, 255] */
     FBAD_OFF        = 0,
-    FBAD_TORCH1     = 125, 
-    FBAD_TORCH2     = 126, 
-    FBAD_TORCH      = 127, 
-    FBAD_PREFLASH   = 128, 
-    FBAD_FULL       = 255, 
+    FBAD_TORCH1     = 125, /*torch level1 mode, 50mA (led1)+ 100mA(led0)*/
+    FBAD_TORCH2     = 126, /*torch level2 mode, 50mA (led1)+ 150mA(led0)*/
+    FBAD_TORCH      = 127, //torch mode, 50mA (led1)+ 50mA(led0)
+    FBAD_PREFLASH   = 128, /*torch level1 mode, 50mA (led1)+ 100mA(led0)*/
+    FBAD_FULL       = 255, /*750mA (led1)+ 750mA(led0)*/
 };
 
+/*
+ * Configurations for each individual LED
+ */
 struct flash_node_data {
 	struct spmi_device		*spmi_dev;
 	struct led_classdev		cdev;
@@ -1373,11 +1379,11 @@ static void qpnp_flash_led_work(struct work_struct *work)
 	}
 
 	if (flash_node->type == DUAL_LEDS) {
-		if (flash_node->prgm_current == FBAD_FULL) {
+		if (flash_node->prgm_current == FBAD_FULL) {//Flash mode
 			if(set_backlight)
 				set_backlight(BACKLIGHT_OFF);
 
-			val = 0x3B;	
+			val = 0x3B;	//600msec
 			rc = qpnp_led_masked_write(led->spmi_dev,
 				FLASH_SAFETY_TIMER(led->base),
 				FLASH_SAFETY_TIMER_MASK, val);
@@ -1396,7 +1402,7 @@ static void qpnp_flash_led_work(struct work_struct *work)
 				goto exit_flash_led_work;
 			}
 
-			val = 0x3B; 
+			val = 0x3B; //750mA
 			rc = qpnp_led_masked_write(led->spmi_dev,
 					FLASH_LED0_CURRENT(led->base),
 					FLASH_CURRENT_MASK, val);
@@ -1440,7 +1446,7 @@ static void qpnp_flash_led_work(struct work_struct *work)
 				goto exit_flash_led_work;
 			}
 
-		} else {	
+		} else {	//torch mode
 			rc = qpnp_led_masked_write(led->spmi_dev,
 				FLASH_LED_UNLOCK_SECURE(led->base),
 				FLASH_SECURE_MASK, FLASH_UNLOCK_SECURE);
@@ -1481,7 +1487,7 @@ static void qpnp_flash_led_work(struct work_struct *work)
 
 			} else if ( (flash_node->prgm_current == FBAD_TORCH1) ||
 					(flash_node->prgm_current == FBAD_PREFLASH) ) {
-				val = 0x07;	
+				val = 0x07;	//100mA(led0)
 				rc = qpnp_led_masked_write(led->spmi_dev,
 					FLASH_LED0_CURRENT(led->base),
 					FLASH_CURRENT_MASK, val);
@@ -1491,7 +1497,7 @@ static void qpnp_flash_led_work(struct work_struct *work)
 					goto exit_flash_led_work;
 				}
 
-				val = 0x03;	
+				val = 0x03;	//50mA (led1)
 				rc = qpnp_led_masked_write(led->spmi_dev,
 					FLASH_LED1_CURRENT(led->base),
 					FLASH_CURRENT_MASK, val);
@@ -1502,7 +1508,7 @@ static void qpnp_flash_led_work(struct work_struct *work)
 				}
 			} else {
 
-				val = 0x0B;	
+				val = 0x0B;	//150mA(led0)
 				rc = qpnp_led_masked_write(led->spmi_dev,
 					FLASH_LED0_CURRENT(led->base),
 					FLASH_CURRENT_MASK, val);
@@ -1512,7 +1518,7 @@ static void qpnp_flash_led_work(struct work_struct *work)
 					goto exit_flash_led_work;
 				}
 
-				val = 0x03;	
+				val = 0x03;	//50mA (led1)
 				rc = qpnp_led_masked_write(led->spmi_dev,
 					FLASH_LED1_CURRENT(led->base),
 					FLASH_CURRENT_MASK, val);
@@ -2154,7 +2160,7 @@ int pmi8994_flash_mode(int led0_curr, int led1_curr)
 
 	this_led->flash_node[this_led->num_leds - 1].flash_on = true;
 	qpnp_flash_led_brightness_set(&this_led->flash_node[this_led->num_leds - 1].cdev, 1);
-	
+	/*** software timer ***/
 	queue_delayed_work(pmi8994_work_queue, &pmi8994_delayed_work, msecs_to_jiffies(FLASH_TIME_OUT));
 
 	mutex_unlock(&this_led->flash_led_lock);

@@ -41,11 +41,11 @@ static int snd_ctl_elem_list_compat(struct snd_card *card,
 
 	data = compat_alloc_user_space(sizeof(*data));
 
-	
+	//HTC_AUD_START klockwork ID: 1390
 	if (data == NULL)
 		return -EFAULT;
-	
-	
+	//HTC_AUD_END
+	/* offset, space, used, count */
 	if (copy_in_user(data, data32, 4 * sizeof(u32)))
 		return -EFAULT;
 	/* pids */
@@ -317,21 +317,25 @@ static int ctl_elem_read_user(struct snd_card *card,
 	err = copy_ctl_value_from_user(card, data, userdata, valuep,
 				       &type, &count);
 	if (err < 0)
+//HTC_AUD_START
 	{
 #ifdef CONFIG_HTC_DEBUG_DSP
 		pr_aud_err("%s: copy from user fail\n", __func__);
 #endif
+//HTC_AUD_END
 		goto error;
-	} 
+	} //HTC_AUDIO
 
 	snd_power_lock(card);
 	err = snd_power_wait(card, SNDRV_CTL_POWER_D0);
 	if (err >= 0)
 		err = snd_ctl_elem_read(card, data);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 	else
 		pr_aud_err("%s: snd_power_wait fail\n", __func__);
 #endif
+//HTC_AUD_END
 	snd_power_unlock(card);
 	if (err >= 0)
 		err = copy_ctl_value_to_user(userdata, valuep, data,
@@ -347,9 +351,11 @@ static int ctl_elem_write_user(struct snd_ctl_file *file,
 	struct snd_ctl_elem_value *data;
 	struct snd_card *card = file->card;
 	int err, type, count;
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 	pr_aud_info("%s: Enter \n", __func__);
 #endif
+//HTC_AUD_END
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (data == NULL)
 		return -ENOMEM;
@@ -357,29 +363,35 @@ static int ctl_elem_write_user(struct snd_ctl_file *file,
 	err = copy_ctl_value_from_user(card, data, userdata, valuep,
 				       &type, &count);
 	if (err < 0)
+//HTC_AUD_START
 	{
 #ifdef CONFIG_HTC_DEBUG_DSP
 		pr_aud_err("%s: copy from user fail\n", __func__);
 #endif
+//HTC_AUD_END
 		goto error;
-	} 
+	} //HTC_AUDIO
 
 	snd_power_lock(card);
 	err = snd_power_wait(card, SNDRV_CTL_POWER_D0);
 	if (err >= 0)
 		err = snd_ctl_elem_write(card, file, data);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 	else
 		pr_aud_err("%s: snd_power_wait fail\n", __func__);
 #endif
+//HTC_AUD_END
 	snd_power_unlock(card);
 	if (err >= 0)
 		err = copy_ctl_value_to_user(userdata, valuep, data,
 					     type, count);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 	else
 		pr_aud_err("%s: snd_clt_elem_write fail\n", __func__);
 #endif
+//HTC_AUD_END
  error:
 	kfree(data);
 	return err;

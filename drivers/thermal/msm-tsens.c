@@ -5763,6 +5763,9 @@ fail_tmdev:
 }
 
 #ifdef CONFIG_PM
+/*
+ * HTC: Avoid wakeup by tsens when suspend/resume.
+ */
 static int tsens_irq_status = 1;
 static int tsens_suspend(struct device *dev)
 {
@@ -5869,7 +5872,7 @@ static int tsens_tm_probe(struct platform_device *pdev)
 	if(!tsens_tm_probe_count) {
 		tsens_tm_probe_count++;
 		if (monitor_tsense_wq == NULL) {
-			
+			/* Create private workqueue... */
 			monitor_tsense_wq = create_workqueue("monitor_tsense_wq");
 			printk(KERN_INFO "Create monitor tsense workqueue(0x%p)...\n", monitor_tsense_wq);
 		}

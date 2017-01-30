@@ -299,9 +299,9 @@ static int camera_v4l2_streamon(struct file *filep, void *fh,
 
 	camera_pack_event(filep, MSM_CAMERA_SET_PARM,
 		MSM_CAMERA_PRIV_STREAM_ON, -1, &event);
-	pr_info("[CAM]%s: + \n", __func__); 
+	pr_info("[CAM]%s: + \n", __func__); //HTC
 	rc = msm_post_event(&event, MSM_POST_EVT_TIMEOUT);
-	pr_info("[CAM]%s: - \n", __func__); 
+	pr_info("[CAM]%s: - \n", __func__); //HTC
 	if (rc < 0)
 		return rc;
 
@@ -319,9 +319,9 @@ static int camera_v4l2_streamoff(struct file *filep, void *fh,
 	if (msm_is_daemon_present() != false) {
 		camera_pack_event(filep, MSM_CAMERA_SET_PARM,
 			MSM_CAMERA_PRIV_STREAM_OFF, -1, &event);
-                pr_info("[CAM]%s: + \n", __func__); 
+                pr_info("[CAM]%s: + \n", __func__); //HTC
 		rc = msm_post_event(&event, MSM_POST_EVT_TIMEOUT);
-                pr_info("[CAM]%s: - \n", __func__); 
+                pr_info("[CAM]%s: - \n", __func__); //HTC
 		if (rc < 0)
 			return rc;
 		rc = camera_check_event_status(&event);
@@ -664,11 +664,11 @@ static int camera_v4l2_open(struct file *filep)
 		}
 
 		if (msm_is_daemon_present() != false) {
-                        pr_info("[CAM]%s: + MSM_CAMERA_NEW_SESSION\n", __func__); 
+                        pr_info("[CAM]%s: + MSM_CAMERA_NEW_SESSION\n", __func__); //HTC
 			camera_pack_event(filep, MSM_CAMERA_NEW_SESSION,
 				0, -1, &event);
 			rc = msm_post_event(&event, MSM_POST_EVT_TIMEOUT);
-                        pr_info("[CAM]%s: -\n", __func__); 
+                        pr_info("[CAM]%s: -\n", __func__); //HTC
 			if (rc < 0) {
 				pr_err("%s : NEW_SESSION event failed,rc %d\n",
 					__func__, rc);
@@ -740,7 +740,7 @@ static int camera_v4l2_close(struct file *filep)
 
 	mutex_lock(&session->close_lock);
 	opn_idx = atomic_read(&pvdev->opened);
-	pr_info("[CAM]%s: close stream_id=%d +\n", __func__, sp->stream_id); 
+	pr_info("[CAM]%s: close stream_id=%d +\n", __func__, sp->stream_id); //HTC
 	pr_debug("%s: close stream_id=%d\n", __func__, sp->stream_id);
 	mask = (1 << sp->stream_id);
 	opn_idx &= ~mask;
@@ -780,7 +780,7 @@ static int camera_v4l2_close(struct file *filep)
 	}
 
 	camera_v4l2_fh_release(filep);
-	pr_info("[CAM]%s: close -\n", __func__); 
+	pr_info("[CAM]%s: close -\n", __func__); //HTC
 
 	return 0;
 }

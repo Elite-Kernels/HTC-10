@@ -169,7 +169,7 @@ struct sdcardfs_inode_info {
 	userid_t userid;
 	uid_t d_uid;
 	bool under_android;
-	
+	/* top folder for ownership */
 	struct inode *top;
 
 	struct inode vfs_inode;
@@ -404,6 +404,7 @@ extern int open_flags_to_access_mode(int open_flags);
 extern int packagelist_init(void);
 extern void packagelist_exit(void);
 
+/* for derived_perm.c */
 extern void setup_derived_state(struct inode *inode, perm_t perm, userid_t userid,
 			uid_t uid, bool under_android, struct inode *top);
 extern void get_derived_permission(struct dentry *parent, struct dentry *dentry);

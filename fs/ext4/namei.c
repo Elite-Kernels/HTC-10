@@ -1141,6 +1141,9 @@ static inline int ext4_ci_match (int len, const char * const name,
 }
 #endif
 
+/*
+ * Returns 0 if not found, -1 on failure, and 1 on success
+ */
 int search_dir(struct buffer_head *bh,
 	       char *search_buf,
 	       int buf_size,
@@ -1163,14 +1166,14 @@ int search_dir(struct buffer_head *bh,
 	de = (struct ext4_dir_entry_2 *)search_buf;
 	dlimit = search_buf + buf_size;
 	while ((char *) de < dlimit) {
-		
-		
+		/* this code is executed quadratically often */
+		/* do minimal checking `by hand' */
 
 #ifdef CONFIG_SDCARD_FS_CI_SEARCH
 		if ((char *) de + namelen <= dlimit) {
 			if (ci_name_buf) {
 				if (ext4_ci_match (namelen, name, de)) {
-					
+					/* found a match - just to be sure, do a full check */
 					if (ext4_check_dir_entry(dir, NULL, de, bh, bh->b_data,
 								bh->b_size, offset))
 						return -1;
@@ -1181,7 +1184,7 @@ int search_dir(struct buffer_head *bh,
 				}
 			} else {
 				if (ext4_match (namelen, name, de)) {
-					
+					/* found a match - just to be sure, do a full check */
 					if (ext4_check_dir_entry(dir, NULL, de, bh, bh->b_data,
 								bh->b_size, offset))
 						return -1;
@@ -1201,7 +1204,7 @@ int search_dir(struct buffer_head *bh,
 			return 1;
 		}
 #endif
-		
+		/* prevent looping on a bad block */
 		de_len = ext4_rec_len_from_disk(de->rec_len,
 						dir->i_sb->s_blocksize);
 		if (de_len <= 0)

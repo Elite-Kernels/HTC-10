@@ -996,6 +996,15 @@ struct kgsl_gpumem_sync_cache_bulk {
 #define IOCTL_KGSL_GPUMEM_SYNC_CACHE_BULK \
 	_IOWR(KGSL_IOC_TYPE, 0x3C, struct kgsl_gpumem_sync_cache_bulk)
 
+/*
+ * kgsl_get_alloc_size - acquire memory size allocated in kernel space by kgsl
+ * @detailed: to indicate if need detailed info,
+ * set detailed to 1, if need the detailed info
+ * of each gfx process for different type memory usage,
+ * said ion, ashmem, kernel ...etc
+ *
+ * Returns allocated memory size and prints kgsl meminfo in kernel log if set detailed
+ */
 #ifdef CONFIG_MSM_KGSL
 unsigned int kgsl_get_alloc_size(int detailed);
 #else
@@ -1005,6 +1014,16 @@ static inline unsigned int kgsl_get_alloc_size(__attribute__((unused))int detail
 }
 #endif
 
+/*
+ * struct kgsl_cmd_syncpoint_timestamp
+ * @context_id: ID of a KGSL context
+ * @timestamp: GPU timestamp
+ *
+ * This structure defines a syncpoint comprising a context/timestamp pair. A
+ * list of these may be passed by IOCTL_KGSL_SUBMIT_COMMANDS to define
+ * dependencies that must be met before the command can be submitted to the
+ * hardware
+ */
 struct kgsl_cmd_syncpoint_timestamp {
 	unsigned int context_id;
 	unsigned int timestamp;

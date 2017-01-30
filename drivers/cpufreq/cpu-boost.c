@@ -96,7 +96,7 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 		cp++;
 	}
 
-	
+	//assign input boost freq to all cpus in the same cluster
 	boost_freq = 0;
 	for_each_cpu(i, (struct cpumask *) (&big_cluster_mask)) {
 		if (!boost_freq && per_cpu(sync_info, i).input_boost_freq != 0) {
@@ -106,13 +106,13 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 			per_cpu(sync_info, i).input_boost_freq = boost_freq;
 		}
 	}
-	
+	//check if need to do boost for big cluster
 	if (boost_freq)
 		wake_bc = 1;
 	else
 		wake_bc = 0;
 
-	
+	//assign input boost freq to all cpus in the same cluster
 	boost_freq = 0;
 	for_each_cpu(i, (struct cpumask *) (&little_cluster_mask)) {
 		if (!boost_freq && per_cpu(sync_info, i).input_boost_freq != 0) {
@@ -122,7 +122,7 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 			per_cpu(sync_info, i).input_boost_freq = boost_freq;
 		}
 	}
-	
+	//check if need to do boost for little cluster
 	if (boost_freq)
 		wake_lc = 1;
 	else
@@ -286,7 +286,7 @@ static int do_input_boost(void *data)
 			}
 		}
 
-		
+		/* Enable scheduler boost to migrate tasks to big cluster */
 		if (sched_boost_on_input) {
 			ret = sched_set_boost(1);
 			if (ret)
@@ -311,11 +311,11 @@ static void cpuboost_input_event(struct input_handle *handle,
 	if (!input_boost_enabled)
 		return;
 
-	
+	/* touch down. */
 	if (type == EV_ABS && code == ABS_MT_TRACKING_ID && value != -1)
 		need_boost = 1;
 
-	
+	/* press key */
 	if (type == EV_KEY && value == 1 &&
 		(code == KEY_POWER || code == KEY_VOLUMEUP || code == KEY_VOLUMEDOWN))
 		need_boost = 1;
@@ -329,7 +329,7 @@ static void cpuboost_input_event(struct input_handle *handle,
 
 	cancel_delayed_work(&input_boost_rem);
 
-	
+	// up_task[0] for big cluster, up_task[1] for little cluster
 	if (wake_bc)
 		wake_up_process(up_task[0]);
 

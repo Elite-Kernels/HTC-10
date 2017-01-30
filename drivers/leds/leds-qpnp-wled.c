@@ -324,12 +324,12 @@ struct qpnp_wled {
 	bool en_ext_pfet_sc_pro;
 	bool prev_state;
 
-	
+	/* HTC: FIXME */
 	struct delayed_work flash_work;
 	bool flash_enabled;
 	u16 fs_curr_ua_flash;
 	struct htc_flashlight_dev flash_dev;
-	
+	/* PMIC Noise workaround */
 	u16 hyb_thres_low, hyb_thres_low_wm;
 };
 
@@ -430,7 +430,7 @@ static int qpnp_wled_set_level(struct qpnp_wled *wled, int level)
 		return -EBUSY;
 
 	if (wled->hyb_thres_low_wm) {
-		
+		/* PMIC Noise workaround */
 		rc = qpnp_wled_read_reg(wled, &reg0,
 				QPNP_WLED_HYB_THRES_REG(wled->sink_base));
 		if (rc < 0) {
@@ -450,7 +450,7 @@ static int qpnp_wled_set_level(struct qpnp_wled *wled, int level)
 		}
 	}
 
-	
+	/* set brightness registers */
 	for (i = 0; i < wled->num_strings; i++) {
 		reg = level & QPNP_WLED_BRIGHT_LSB_MASK;
 		rc = qpnp_wled_write_reg(wled, &reg,
@@ -516,6 +516,7 @@ static int qpnp_wled_module_en(struct qpnp_wled *wled,
 	return 0;
 }
 
+/* HTC Implmenetation */
 static int qpnp_wled_flash_en_locked(struct qpnp_wled *wled, int en, int duration)
 {
 	int i, rc = 0;
@@ -547,7 +548,7 @@ static int qpnp_wled_flash_en_locked(struct qpnp_wled *wled, int en, int duratio
 	pr_info("%s: (%d, %d) [fs=%d, level=%d], %d strings\n",
 		__func__, en, duration, fs, level, wled->num_strings);
 
-	
+	/* enable all strings, max backlight level, full scale current */
 	for (i = 0; i < wled->num_strings; i++) {
 #if 0
 		reg = (cabc << QPNP_WLED_CABC_SHIFT);
@@ -576,7 +577,7 @@ static int qpnp_wled_flash_en_locked(struct qpnp_wled *wled, int en, int duratio
 			goto exit;
 	}
 
-	
+	/* sync */
 	reg = QPNP_WLED_SYNC;
 	rc = qpnp_wled_write_reg(wled, &reg, QPNP_WLED_SYNC_REG(wled->sink_base));
 	if (rc < 0)
@@ -640,7 +641,9 @@ static int qpnp_wled_torch_mode(struct htc_flashlight_dev *fl_dev, int mode1, in
 	wled->fs_curr_ua_flash = wled->fs_curr_ua;
 	return qpnp_wled_flash_en(wled, mode1, max_torch_ms);
 }
+/* HTC Implmenetation End */
 
+/* sysfs store function for ramp */
 static ssize_t qpnp_wled_ramp_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -954,6 +957,7 @@ static ssize_t qpnp_wled_flash_en_store(struct device *dev,
 	return count;
 }
 
+/* sysfs attributes exported by wled */
 static struct device_attribute qpnp_wled_attrs[] = {
 	__ATTR(dump_regs, (S_IRUGO | S_IWUSR | S_IWGRP),
 			qpnp_wled_dump_regs_show,
@@ -974,7 +978,7 @@ static struct device_attribute qpnp_wled_attrs[] = {
 			qpnp_wled_ramp_step_show,
 			qpnp_wled_ramp_step_store),
 
-	
+	/* HTC */
 	__ATTR(flash_en, (S_IRUGO | S_IWUSR | S_IWGRP),
 			qpnp_wled_flash_en_show,
 			qpnp_wled_flash_en_store),

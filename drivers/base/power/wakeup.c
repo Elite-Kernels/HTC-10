@@ -459,6 +459,12 @@ static void wakeup_source_report_event(struct wakeup_source *ws)
 extern char wakelock_debug_buf[];
 #endif
 
+/**
+ * __pm_stay_awake - Notify the PM core of a wakeup event.
+ * @ws: Wakeup source object associated with the source of the event.
+ *
+ * It is safe to call this function from interrupt context.
+ */
 void __pm_stay_awake(struct wakeup_source *ws)
 {
 	unsigned long flags;
@@ -974,6 +980,10 @@ void htc_print_active_wakeup_sources(bool print_embedded)
 }
 #endif
 
+/**
+ * wakeup_sources_stats_show - Print wakeup sources statistics information.
+ * @m: seq_file to print the statistics into.
+ */
 static int wakeup_sources_stats_show(struct seq_file *m, void *unused)
 {
 	struct wakeup_source *ws;

@@ -105,7 +105,7 @@ extern void pm_wakeup_event(struct device *dev, unsigned int msec);
 void htc_print_active_wakeup_sources(bool print_embedded);
 #endif
 
-#else 
+#else /* !CONFIG_PM_SLEEP */
 
 static inline void device_set_wakeup_capable(struct device *dev, bool capable)
 {
@@ -186,7 +186,7 @@ static inline void pm_wakeup_event(struct device *dev, unsigned int msec) {}
 static inline void htc_print_active_wakeup_sources(bool print_embedded) {}
 #endif
 
-#endif 
+#endif /* !CONFIG_PM_SLEEP */
 
 static inline void wakeup_source_init(struct wakeup_source *ws,
 				      const char *name)

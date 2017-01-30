@@ -97,6 +97,9 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 #if defined(CONFIG_HTC_DEBUG_RTB)
 	static int enable_logk_die = 1;
 #endif
+	/*
+	 * Are we prepared to handle this kernel fault?
+	 */
 	if (fixup_exception(regs))
 		return;
 
@@ -105,11 +108,14 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 		uncached_logk(LOGK_DIE, (void *)regs->pc);
 		uncached_logk(LOGK_DIE, (void *)regs->regs[30]);
 		uncached_logk(LOGK_DIE, (void *)addr);
-		
+		/* Disable RTB here to avoid weird recursive spinlock/printk behaviors */
 		msm_rtb_disable();
 		enable_logk_die = 0;
 	}
 #endif
+	/*
+	 * No handler, we'll have to terminate things with extreme prejudice.
+	 */
 	bust_spinlocks(1);
 	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
 		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
@@ -395,6 +401,9 @@ static int do_alignment_fault(unsigned long addr, unsigned int esr,
 	return 0;
 }
 
+/*
+ * This abort handler always returns "fault".
+ */
 static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
 {
 	arm64_check_cache_ecc(NULL);

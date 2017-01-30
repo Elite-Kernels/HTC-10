@@ -657,6 +657,14 @@ void resched_cpu(int cpu)
 
 #ifdef CONFIG_SMP
 #ifdef CONFIG_NO_HZ_COMMON
+/*
+ * In the semi idle case, use the nearest busy cpu for migrating timers
+ * from an idle cpu.  This is good for power-savings.
+ *
+ * We don't do similar optimization for completely idle system, as
+ * selecting an idle cpu will add more delays to the timers than intended
+ * (as that cpu's timer base may not be uptodate wrt jiffies etc).
+ */
 
 extern int over_schedule_budget(int cpu);
 int get_nohz_timer_target(int pinned)
@@ -1857,7 +1865,7 @@ update_window_start(struct rq *rq, u64 wallclock)
 	int nr_windows;
 
 	delta = wallclock - rq->window_start;
-	
+	/* If the MPM global timer is cleared, set delta as 0 to avoid kernel BUG happening */
 	if (delta < 0) {
 		if (arch_counter_get_cntpct() == 0)
 			delta = 0;
@@ -1912,6 +1920,7 @@ nearly_same_freq(unsigned int cur_freq, unsigned int freq_required)
 	return delta < sysctl_sched_freq_dec_notify;
 }
 
+/* Convert busy time to frequency equivalent */
 unsigned int load_to_freq(struct rq *rq, u64 load)
 {
 	unsigned int freq;
@@ -2730,7 +2739,7 @@ int sched_update_freq_max_load(const cpumask_t *cpumask)
 
 		i = 0;
 		costs = per_cpu_info[cpu].ptable;
-		while (costs[i].freq) {
+		while (i<per_cpu_info[cpu].len && costs[i].freq) {
 			entry = &max_load->freqs[i];
 			freq = costs[i].freq;
 			hpct = get_freq_max_load(cpu, freq);
@@ -6196,7 +6205,7 @@ NOKPROBE_SYMBOL(preempt_count_sub);
 static noinline void __schedule_bug(struct task_struct *prev)
 {
 #ifdef CONFIG_DEBUG_PREEMPT
-	
+	/* Save this before calling printk(), since that will clobber it */
 	unsigned long preempt_disable_ip = get_preempt_disable_ip(current);
 #endif
 
@@ -8142,6 +8151,9 @@ void sched_show_task(struct task_struct *p)
 	if (state == TASK_UNINTERRUPTIBLE) {
 		struct task_struct* blocker = p->blocked_by;
 		if (blocker) {
+			/* The content of 'blocker' here might be invalid if
+			 * the previous locker exits imediately after unlock.
+			 */
 			printk(KERN_CONT " blocked by %.32s (%d:%d) for %u ms\n",
 				blocker->comm, blocker->tgid, blocker->pid,
 				jiffies_to_msecs(jiffies - p->blocked_since));
@@ -10894,7 +10906,7 @@ early_initcall(__might_sleep_init);
 
 void __might_sleep(const char *file, int line, int preempt_offset)
 {
-	static unsigned long prev_jiffy;	
+	static unsigned long prev_jiffy;	/* ratelimiting */
 #ifdef CONFIG_DEBUG_PREEMPT
 	unsigned long preempt_disable_ip;
 #endif
@@ -10911,7 +10923,7 @@ void __might_sleep(const char *file, int line, int preempt_offset)
 	prev_jiffy = jiffies;
 
 #ifdef CONFIG_DEBUG_PREEMPT
-	
+	/* Save this before calling printk(), since that will clobber it */
 	preempt_disable_ip = get_preempt_disable_ip(current);
 #endif
 

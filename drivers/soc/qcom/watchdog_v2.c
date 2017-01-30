@@ -124,7 +124,7 @@ void msm_watchdog_bark(void)
 	__raw_writel(1, msm_wdt_base + WDT0_EN);
 }
 EXPORT_SYMBOL(msm_watchdog_bark);
-#endif 
+#endif /* CONFIG_HTC_DEBUG_WATCHDOG */
 
 /*
  * On the kernel command line specify
@@ -395,12 +395,12 @@ static __ref int watchdog_kthread(void *arg)
 		mod_timer(&wdog_dd->pet_timer, jiffies + delay_time);
 #if defined(CONFIG_HTC_DEBUG_WATCHDOG)
 		htc_debug_watchdog_update_last_pet(wdog_dd->last_pet);
-		
+		/* TODO: support this funciton with CONFIG_SPARSE_IRQ */
 #if !defined(CONFIG_SPARSE_IRQ)
-		
+		/* records last_irqs */
 		htc_debug_watchdog_dump_irqs(0);
 #endif
-#endif 
+#endif /* CONFIG_HTC_DEBUG_WATCHDOG */
 	}
 
 	return 0;
@@ -555,7 +555,7 @@ static void configure_bark_dump(struct msm_watchdog_data *wdog_dd)
 		}
 	} else {
 #if defined(CONFIG_HTC_DEBUG_MEM_DUMP_TABLE)
-		
+		/* cpu dump data entry and cpu_buf are already configured and registered in LK, so just return */
 		return;
 #endif
 		cpu_data = kzalloc(sizeof(struct msm_dump_data) *

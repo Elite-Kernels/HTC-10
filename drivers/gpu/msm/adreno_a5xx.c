@@ -3171,7 +3171,7 @@ static void a5xx_irq_storm_worker(struct work_struct *work)
 	KGSL_DRV_WARN(device, "Re-enabled A5XX_INT_CP_CACHE_FLUSH_TS");
 	mutex_unlock(&device->mutex);
 
-	
+	/* Reschedule just to make sure everything retires */
 	adreno_dispatcher_schedule(device);
 }
 

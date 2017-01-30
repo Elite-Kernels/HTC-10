@@ -915,7 +915,7 @@ const char * const vmstat_text[] = {
 	"compact_stall_1000",
 	"compact_stall_horder"
 #endif
-#endif 
+#endif /* CONFIG_VM_EVENTS_COUNTERS */
 };
 #endif /* CONFIG_PROC_FS || CONFIG_SYSFS || CONFIG_NUMA */
 
@@ -1542,11 +1542,11 @@ void dump_vm_events_counter(void)
 	int i;
 
 	all_vm_events(events);
-	
+	/* sectors -> kbytes */
 	events[PGPGIN] /= 2;
 	events[PGPGOUT] /= 2;
 
-	
+	/* dump increased counters within a certain period of time */
 	for (i = 0; i < NR_VM_EVENT_ITEMS; i++) {
 		if (events[i] - prev_events[i] > 0)
 			pr_info("[K] %s_diff = %lu\n",
@@ -1561,7 +1561,7 @@ void vm_event_report_meminfo(struct seq_file *m)
 	unsigned long events[NR_VM_EVENT_ITEMS];
 
 	all_vm_events(events);
-	
+	/* sectors -> kbytes */
 	events[PGPGIN] /= 2;
 	events[PGPGOUT] /= 2;
 

@@ -35,7 +35,9 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("IPv4 packet filter");
 
- 
+/*#define DEBUG_IP_FIREWALL*/
+/*#define DEBUG_ALLOW_ALL*/ /* Useful for remote debugging */
+/*#define DEBUG_IP_FIREWALL_USER*/
 
 #ifdef DEBUG_IP_FIREWALL
 #define dprintf(format, args...) pr_info(format , ## args)
@@ -164,6 +166,8 @@ get_entry(const void *base, unsigned int offset)
 	return (struct ipt_entry *)(base + offset);
 }
 
+/* All zeroes == unconditional rule. */
+/* Mildly perf critical (only if packet tracing is on) */
 static inline bool unconditional(const struct ipt_entry *e)
 {
 	static const struct ipt_ip uncond;
@@ -230,7 +234,7 @@ get_chainname_rulenum(const struct ipt_entry *s, const struct ipt_entry *e,
 		    strcmp(t->target.u.kernel.target->name,
 			   XT_STANDARD_TARGET) == 0 &&
 		   t->verdict < 0) {
-			
+			/* Tail of chains: STANDARD target (return/policy) */
 			*comment = *chainname == hookname
 				? comments[NF_IP_TRACE_COMMENT_POLICY]
 				: comments[NF_IP_TRACE_COMMENT_RETURN];
@@ -467,7 +471,7 @@ mark_source_chains(const struct xt_table_info *newinfo,
 			}
 			e->comefrom |= ((1 << hook) | (1 << NF_INET_NUMHOOKS));
 
-			
+			/* Unconditional return/END. */
 			if ((unconditional(e) &&
 			     (strcmp(t->target.u.user.name,
 				     XT_STANDARD_TARGET) == 0) &&
@@ -738,7 +742,7 @@ check_entry_size_and_hooks(struct ipt_entry *e,
 	if (err)
 		return err;
 
-	
+	/* Check hooks & underflows */
 	for (h = 0; h < NF_INET_NUMHOOKS; h++) {
 		if (!(valid_hooks & (1 << h)))
 			continue;
@@ -1498,7 +1502,7 @@ check_compat_entry_size_and_hooks(struct compat_ipt_entry *e,
 		return -EINVAL;
 	}
 
-	
+	/* For purposes of check_entry casting the compat entry is fine */
 	ret = check_entry((struct ipt_entry *)e);
 	if (ret)
 		return ret;

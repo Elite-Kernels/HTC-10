@@ -186,7 +186,7 @@ static void htc_lpm_pre_action(bool from_idle)
 	int is_last_core_for_suspend = (!from_idle && cpu_online(smp_processor_id()));
 
 	if (is_last_core_for_suspend) {
-		
+		/* prevent_enter_vddmin(false); */
 		if (suspend_console_deferred)
 			suspend_console();
 	}
@@ -200,7 +200,7 @@ static void htc_lpm_post_action(bool from_idle)
 		if (suspend_console_deferred)
 			resume_console();
 
-		
+		/* prevent_enter_vddmin(true); */
 	}
 }
 
@@ -1054,6 +1054,9 @@ bool psci_enter_sleep(struct lpm_cluster *cluster, int idx, bool from_idle)
 #ifdef CONFIG_HTC_POWER_DEBUG
 	int64_t time;
 #endif
+	/*
+	 * idx = 0 is the default LPM state
+	 */
 	if (!idx) {
 		htc_lpm_pre_action(from_idle);
 		stop_critical_timings();
@@ -1522,6 +1525,9 @@ static int lpm_suspend_enter(suspend_state_t state)
 
 #ifdef CONFIG_HTC_POWER_DEBUG
 		if (MSM_PM_DEBUG_CLOCK & msm_pm_debug_mask)
+		/*	Fix me when clock_block_print() ready
+		 *	clock_blocked_print();
+		 */
 			pr_info("The MSM_PM_DEBUG_CLOCK turn on");
 #endif
 	if (!use_psci)

@@ -205,6 +205,8 @@ static void rmnet_reset_mac_header(struct sk_buff *skb)
  * Return:
  *      - RMNET_DATA_GRO_RCV_FAIL if packet is sent to netif_receive_skb()
  *      - RMNET_DATA_GRO_RCV_PASS if packet is sent to napi_gro_receive()
+ * Tuning this parameter will trade TCP slow start performance for power.
+ *
  */
 static int rmnet_check_skb_can_gro(struct sk_buff *skb)
 {

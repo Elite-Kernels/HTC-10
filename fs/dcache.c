@@ -2612,6 +2612,15 @@ struct dentry *d_ancestor(struct dentry *p1, struct dentry *p2)
 	return NULL;
 }
 
+/*
+ * This helper attempts to cope with remotely renamed directories
+ *
+ * It assumes that the caller is already holding
+ * dentry->d_parent->d_inode->i_mutex, inode->i_lock and rename_lock
+ *
+ * Note: If ever the locking in lock_rename() changes, then please
+ * remember to update this too...
+ */
 static int __d_unalias(struct inode *inode,
 		struct dentry *dentry, struct dentry *alias)
 {
@@ -2708,7 +2717,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 			return new;
 		}
 	}
-	
+	/* already taking inode->i_lock, so d_add() by hand */
 	__d_instantiate(dentry, inode);
 	spin_unlock(&inode->i_lock);
 out:

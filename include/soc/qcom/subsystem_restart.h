@@ -93,10 +93,10 @@ struct subsys_desc {
 	int sysmon_shutdown_ret;
 	bool system_debug;
 	const char *edge;
-#if 1 
+#if 1 //Modem_BSP++
        irqreturn_t (*reboot_req_handler) (int irq, void *dev_id);
        unsigned int reboot_req_irq;
-#endif 
+#endif //Modem_BSP--
 };
 
 /**
@@ -123,7 +123,7 @@ extern bool htc_check_modem_crash_status ( void );
 
 #if defined(CONFIG_HTC_DEBUG_SSR)
 void subsys_set_restart_reason(struct subsys_device *dev, const char *reason);
-#endif 
+#endif /* CONFIG_HTC_DEBUG_SSR  */
 
 #if defined(CONFIG_HTC_FEATURES_SSR)
 extern void subsys_set_enable_ramdump(struct subsys_device *dev, int enable);
@@ -173,7 +173,7 @@ static inline void subsys_set_restart_reason(struct subsys_device *dev, const ch
 {
 	return;
 }
-#endif 
+#endif /* CONFIG_HTC_DEBUG_SSR */
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
 {

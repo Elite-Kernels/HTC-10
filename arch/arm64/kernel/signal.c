@@ -347,6 +347,9 @@ static void do_signal(struct pt_regs *regs)
 	if (t->comm && strstr(t->comm, "dq_log")) {
 		printk("[%s] %s ++\n", __func__, t->comm);
 	}
+	/*
+	 * If we were from a system call, check for system call restarting...
+	 */
 	if (syscall >= 0) {
 		continue_addr = regs->pc;
 		restart_addr = continue_addr - (compat_thumb_mode(regs) ? 2 : 4);

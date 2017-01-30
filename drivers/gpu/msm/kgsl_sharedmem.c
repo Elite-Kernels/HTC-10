@@ -654,6 +654,23 @@ static void kgsl_zero_pages(struct page **pages, unsigned int pcount)
 	pgprot_t page_prot = pgprot_writecombine(PAGE_KERNEL);
 	void *ptr;
 
+	/*
+	 * All memory that goes to the user has to be zeroed out before it gets
+	 * exposed to userspace. This means that the memory has to be mapped in
+	 * the kernel, zeroed (memset) and then unmapped.  This also means that
+	 * the dcache has to be flushed to ensure coherency between the kernel
+	 * and user pages. We used to pass __GFP_ZERO to alloc_page which mapped
+	 * zeroed and unmaped each individual page, and then we had to turn
+	 * around and call flush_dcache_page() on that page to clear the caches.
+	 * This was killing us for performance. Instead, we found it is much
+	 * faster to allocate the pages without GFP_ZERO, map a chunk of the
+	 * range ('step' pages), memset it, flush it and then unmap
+	 * - this results in a factor of 4 improvement for speed for large
+	 * buffers. There is a small decrease in speed for small buffers,
+	 * but only on the order of a few microseconds at best. The 'step'
+	 * size is based on a guess at the amount of free vmalloc space, but
+	 * will scale down if there's not enough free space.
+	 */
 	for (j = 0; j < pcount; j += step) {
 		step = min(step, pcount - j);
 
@@ -665,7 +682,7 @@ static void kgsl_zero_pages(struct page **pages, unsigned int pcount)
 			vunmap(ptr);
 		} else {
 			int k;
-			
+			/* Very, very, very slow path */
 
 			for (k = j; k < j + step; k++) {
 				ptr = kmap_atomic(pages[k]);
@@ -673,7 +690,7 @@ static void kgsl_zero_pages(struct page **pages, unsigned int pcount)
 				dmac_flush_range(ptr, ptr + PAGE_SIZE);
 				kunmap_atomic(ptr);
 			}
-			
+			/* scale down the step size to avoid this path */
 			if (step > 1)
 				step >>= 1;
 		}
@@ -737,7 +754,7 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 	while (len > 0) {
 		int page_count;
 
-		
+		/* don't waste space at the end of the allocation*/
 		if (len < page_size)
 			page_size = PAGE_SIZE;
 
@@ -829,6 +846,9 @@ kgsl_sharedmem_page_alloc_user(struct kgsl_memdesc *memdesc,
 	if (memdesc->private)
 		kgsl_process_add_stats(memdesc->private, KGSL_MEM_ENTRY_PAGE_ALLOC, size);
 
+	/*
+	 * Zero out the pages.
+	 */
 	kgsl_zero_pages(memdesc->pages, pcount);
 
 done:

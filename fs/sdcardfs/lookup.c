@@ -236,14 +236,14 @@ static struct dentry *__sdcardfs_lookup(struct dentry *dentry,
 	/* now start the actual lookup procedure */
 	lower_dir_dentry = lower_parent_path->dentry;
 	lower_dir_mnt = lower_parent_path->mnt;
-	
+	/* Use vfs_path_lookup to check if the dentry exists or not */
 #ifdef CONFIG_SDCARD_FS_CI_SEARCH
 	err = vfs_path_lookup(lower_dir_dentry, lower_dir_mnt, name,
 				LOOKUP_CASE_INSENSITIVE, &lower_path);
 #else
 	err = vfs_path_lookup(lower_dir_dentry, lower_dir_mnt, name, 0,
 				&lower_path);
-	
+	/* check for other cases */
 	if (err == -ENOENT) {
 		struct dentry *child;
 		struct dentry *match = NULL;
@@ -392,7 +392,7 @@ struct dentry *sdcardfs_lookup(struct inode *dir, struct dentry *dentry,
 	if (dentry->d_inode) {
 		fsstack_copy_attr_times(dentry->d_inode,
 					sdcardfs_lower_inode(dentry->d_inode));
-		
+		/* get derived permission */
 		get_derived_permission(parent, dentry);
 		fix_derived_permission(dentry->d_inode);
 	}

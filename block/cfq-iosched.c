@@ -38,6 +38,9 @@ static const int cfq_hist_divisor = 4;
 
 extern int launch_event_enabled;
 
+/*
+ * offset from end of service tree
+ */
 #define CFQ_IDLE_DELAY		(HZ / 5)
 
 /*

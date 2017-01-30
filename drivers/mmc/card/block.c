@@ -65,8 +65,8 @@ MODULE_ALIAS("mmc:block");
 #define INAND_CMD38_ARG_SECERASE 0x80
 #define INAND_CMD38_ARG_SECTRIM1 0x81
 #define INAND_CMD38_ARG_SECTRIM2 0x88
-#define MMC_BLK_TIMEOUT_MS	(3 * 1000)	
-#define MMC_BLK_TIME_WARN_MS  	(1 * 1000)	
+#define MMC_BLK_TIMEOUT_MS	(3 * 1000)	/* 3 sec timeout */
+#define MMC_BLK_TIME_WARN_MS  	(1 * 1000)	/* 1 sec show warning */
 #define MMC_SANITIZE_REQ_TIMEOUT 240000
 #define MMC_EXTRACT_INDEX_FROM_ARG(x) ((x & 0x00FF0000) >> 16)
 #define MMC_CMDQ_STOP_TIMEOUT_MS 100
@@ -78,7 +78,7 @@ MODULE_ALIAS("mmc:block");
 #define PACKED_CMD_WR	0x02
 #define PACKED_TRIGGER_MAX_ELEMENTS	5000
 
-#define MMC_BLK_MAX_RETRIES 2 
+#define MMC_BLK_MAX_RETRIES 2 /* max # of retries before aborting a command */
 #define MMC_BLK_UPDATE_STOP_REASON(stats, reason)			\
 	do {								\
 		if (stats->enabled)					\
@@ -836,7 +836,7 @@ static int mmc_blk_ioctl_rpmb_cmd(struct block_device *bdev,
 
 	pr_info("%s start\n", __func__);
 
-	
+	/* The caller must have CAP_SYS_RAWIO */
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
@@ -1498,6 +1498,10 @@ static int mmc_blk_reset(struct mmc_blk_data *md, struct mmc_host *host,
 		main_md->part_curr = main_md->part_type;
 		part_err = mmc_blk_part_switch(host->card, md);
 		if (part_err) {
+			/*
+			 * We have failed to get back into the correct
+			 * partition, so we need to abort the whole request.
+			 */
 			pr_info("%s: %s return %d\n", mmc_hostname(host),
 				__func__, -ENODEV);
 			return -ENODEV;
@@ -1658,6 +1662,11 @@ static int mmc_blk_cmdq_issue_secdiscard_rq(struct mmc_queue *mq,
 	from = blk_rq_pos(req);
 	nr = blk_rq_sectors(req);
 
+	/*
+	 * eMMC will be corrupted if secure-trim and secure-erase are adopted.
+	 * Therefore, replace secure-trim and secure-erase args with trim and
+	 * erase args respectively.
+	 */
 	if (mmc_can_trim(card) && !mmc_erase_group_aligned(card, from, nr))
 		arg = MMC_TRIM_ARG;
 	else
@@ -1692,6 +1701,11 @@ static int mmc_blk_issue_secdiscard_rq(struct mmc_queue *mq,
 	from = blk_rq_pos(req);
 	nr = blk_rq_sectors(req);
 
+	/*
+	 * eMMC will be corrupted if secure-trim and secure-erase are adopted.
+	 * Therefore, replace secure-trim and secure-erase args with trim and
+	 * erase args respectively.
+	 */
 	if (mmc_can_trim(card) && !mmc_erase_group_aligned(card, from, nr))
 		arg = MMC_TRIM_ARG;
 	else
@@ -1863,6 +1877,9 @@ static int mmc_blk_err_check(struct mmc_card *card,
 		time_alarm = jiffies + msecs_to_jiffies(MMC_BLK_TIME_WARN_MS);
 		err = card_busy_detect(card, MMC_BLK_TIMEOUT_MS, false, req,
 					&gen_err);
+		/* if mmc card programing over 1 sec
+		 * we need to record this warning for analysis
+		 */
 		if (time_after(jiffies, time_alarm)) {
 			pr_err("%s: Card spend over 1 sec !"\
 				" %s %s\n", mmc_hostname(card->host),
@@ -2756,7 +2773,7 @@ static struct mmc_cmdq_req *mmc_blk_cmdq_rw_prep(
 	if (prio)
 		cmdq_rq->cmdq_req_flags |= PRIO;
 
-	
+	/* FIXME: Disable reliable write feature */
 	do_rel_wr = false;
 
 	if (do_rel_wr)
@@ -2847,7 +2864,20 @@ static int mmc_blk_cmdq_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 	ret = mmc_blk_cmdq_start_req(card->host, mc_rq);
 	if (!ret && active_small_sector_read)
 		host->cmdq_ctx.active_small_sector_read_reqs++;
+	/*
+	 * When in SVS2 on low load scenario and there are lots of requests
+	 * queued for CMDQ we need to wait till the queue is empty to scale
+	 * back up to Nominal even if there is a sudden increase in load.
+	 * This impacts performance where lots of IO get executed in SVS2
+	 * frequency since the queue is full. As SVS2 is a low load use case
+	 * we can serialize the requests and not queue them in parallel
+	 * without impacting other use cases. This makes sure the queue gets
+	 * empty faster and we will be able to scale up to Nominal frequency
+	 * when needed.
+	 */
 	if (!ret && (host->clk_scaling.state == MMC_LOAD_LOW)) {
+		/* FIXME: avoid deadlock when CMDQ happen error.
+                               It could have a little influence at performance when error happen */
 		err = wait_event_interruptible_timeout(ctx->queue_empty_wq,
 					(!ctx->active_reqs), msecs_to_jiffies(500));
 		if (err <= 0)
@@ -3221,7 +3251,7 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 		goto out;
 	}
 
-	
+	/* FIXME: when happen timeout, drop other requests until host reset requests */
 	if (test_bit(CMDQ_STATE_ERR, &ctx_info->curr_state)) {
 		pr_err("%s: %s: tag=%d, curr_state=%lu, err=%d\n",
 			mmc_hostname(mrq->host), __func__,
@@ -3229,6 +3259,11 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 		goto out;
 	}
 
+	/*
+	 * In case of error CMDQ is expected to be either in halted
+	 * or disable state so cannot receive any completion of
+	 * other requests.
+	 */
 	BUG_ON(test_bit(CMDQ_STATE_ERR, &ctx_info->curr_state));
 
 	/* clear pending request */
@@ -3250,12 +3285,12 @@ void mmc_blk_cmdq_complete_rq(struct request *rq)
 	if (mrq->data) {
 		if (host->perf_enable) {
 			now = ktime_get();
-			
+			// rw_start_time: would be the request start or previous rw_end_time.
 			diff = ktime_sub(now, (mrq->data->flags == MMC_DATA_READ) ?
 				host->perf.cmdq_read_start : host->perf.cmdq_write_start);
 
 			if (host->card)
-				
+				// Not real CMD46/47, and real commands are issued by CPU
 				trace_mmc_request_done(&host->class_dev,
 					(mrq->data->flags == MMC_DATA_READ) ? 46 : 47,
 					cmdq_req->blk_addr, mrq->data->blocks,
@@ -3415,7 +3450,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				__func__, status, retry);
 			if (retry++ < MMC_BLK_MAX_RETRIES)
 				break;
-			
+			/* Fall through */
 		case MMC_BLK_CMD_ERR:
 		case MMC_BLK_ECC_ERR:
 		case MMC_BLK_ABORT:

@@ -819,11 +819,11 @@ static void pll_db_commit_8996(struct mdss_pll_resources *pll,
 	udelay(10);
 
 	MDSS_PLL_REG_W(pll_base, DSIPHY_CMN_CTRL_1, 0);
-	wmb();	
+	wmb();	/* make sure register committed */
 
 	MDSS_PLL_REG_W(pll_base, DSIPHY_PLL_PLL_VCO_TUNE, 0);
 	MDSS_PLL_REG_W(pll_base, DSIPHY_PLL_KVCO_CODE, 0);
-	wmb(); 
+	wmb(); /* make sure register committed */
 
 	data = pdb->in.dsiclk_sel; /* set dsiclk_sel = 1  */
 	MDSS_PLL_REG_W(pll_base, DSIPHY_CMN_CLK_CFG1, data);

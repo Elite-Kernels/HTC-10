@@ -2229,9 +2229,11 @@ static void pcm_release_private(struct snd_pcm_substream *substream)
 
 void snd_pcm_release_substream(struct snd_pcm_substream *substream)
 {
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 	pr_info("[AUD]%s: substream %p ref_count %d\n", __func__, substream, substream->ref_count);
 #endif
+//HTC_AUD_END
 	substream->ref_count--;
 	if (substream->ref_count > 0)
 		return;
@@ -2305,10 +2307,12 @@ static int snd_pcm_open_file(struct file *file,
 	int err;
 
 	err = snd_pcm_open_substream(pcm, stream, file, &substream);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 	pr_info("[AUD]%s: pcm %p substream %p ref_count %d err %d\n",
             __func__, pcm, substream, substream->ref_count, err);
 #endif
+//HTC_AUD_END
 	if (err < 0)
 		return err;
 
@@ -2331,17 +2335,21 @@ static int snd_pcm_playback_open(struct inode *inode, struct file *file)
 {
 	struct snd_pcm *pcm;
 	int err = nonseekable_open(inode, file);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
-	pr_info("[AUD]%s: nonseekable_open, err %d", __func__, err); 
+	pr_info("[AUD]%s: nonseekable_open, err %d", __func__, err); //HTC_AUD
 #endif
+//HTC_AUD_END
 	if (err < 0)
 		return err;
 	pcm = snd_lookup_minor_data(iminor(inode),
 				    SNDRV_DEVICE_TYPE_PCM_PLAYBACK);
 	err = snd_pcm_open(file, pcm, SNDRV_PCM_STREAM_PLAYBACK);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
-	pr_info("[AUD]%s: snd_pcm_open, err %d", __func__, err); 
+	pr_info("[AUD]%s: snd_pcm_open, err %d", __func__, err); //HTC_AUD
 #endif
+//HTC_AUD_END
 	if (pcm)
 		snd_card_unref(pcm->card);
 	return err;
@@ -2426,10 +2434,12 @@ static int snd_pcm_release(struct inode *inode, struct file *file)
 
 	pcm_file = file->private_data;
 	substream = pcm_file->substream;
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 	pr_info("[AUD]%s: pcm %p substream %p ref_count %d\n",
 		__func__, substream->pcm, substream, substream->ref_count);
 #endif
+//HTC_AUD_END
 	if (snd_BUG_ON(!substream))
 		return -ENXIO;
 	pcm = substream->pcm;

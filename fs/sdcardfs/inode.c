@@ -79,10 +79,10 @@ static int sdcardfs_create(struct inode *dir, struct dentry *dentry,
 	if (err)
 		goto out_unlock;
 
-	
+	/* set last 16bytes of mode field to 0664 */
 	mode = (mode & S_IFMT) | 00664;
 
-	
+	/* temporarily change umask for lower fs write */
 	saved_fs = current->fs;
 	copied_fs = copy_fs_struct(current->fs);
 	current->fs = copied_fs;
@@ -311,10 +311,10 @@ static int sdcardfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 		goto out_unlock;
 	}
 
-	
+	/* set last 16bytes of mode field to 0775 */
 	mode = (mode & S_IFMT) | 00775;
 
-	
+	/* temporarily change umask for lower fs write */
 	saved_fs = current->fs;
 	copied_fs = copy_fs_struct(current->fs);
 	current->fs = copied_fs;
@@ -334,12 +334,12 @@ static int sdcardfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 
 	fsstack_copy_attr_times(dir, sdcardfs_lower_inode(dir));
 	fsstack_copy_inode_size(dir, lower_parent_dentry->d_inode);
-	
+	/* update number of links on parent directory */
 	set_nlink(dir, sdcardfs_lower_inode(dir)->i_nlink);
 
 	unlock_dir(lower_parent_dentry);
 
-	
+	/* if it is a local obb dentry, setup it with the base obbpath */
 	if(need_graft_path(dentry)) {
 
 		err = setup_obb_dentry(dentry, &lower_path);
@@ -553,6 +553,8 @@ static int sdcardfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			dput(new_parent);
 		}
 	}
+	/* At this point, not all dentry information has been moved, so
+	 * we pass along new_dentry for the name.*/
 	get_derived_permission_new(new_dentry->d_parent, old_dentry, new_dentry);
 	fix_derived_permission(old_dentry->d_inode);
 	fixup_top_recursive(old_dentry);
@@ -635,7 +637,7 @@ static int sdcardfs_permission(struct inode *inode, int mask)
 	int err;
 	struct inode *top = SDCARDFS_I(inode)->top;
 
-	
+	/* Ensure owner is up to date */
 	if(top != NULL)
 	{
 		if (from_kuid(&init_user_ns, inode->i_uid) != from_kuid(&init_user_ns, top->i_uid)) {
@@ -753,6 +755,8 @@ static int sdcardfs_setattr(struct dentry *dentry, struct iattr *ia)
 	if (lower_ia.ia_valid & (ATTR_KILL_SUID | ATTR_KILL_SGID))
 		lower_ia.ia_valid &= ~ATTR_MODE;
 
+	if (current->mm)
+		up_write(&current->mm->mmap_sem);
 	/* notify the (possibly copied-up) lower inode */
 	/*
 	 * Note: we use lower_dentry->d_inode, because lower_inode may be
@@ -760,11 +764,13 @@ static int sdcardfs_setattr(struct dentry *dentry, struct iattr *ia)
 	 * tries to open(), unlink(), then ftruncate() a file.
 	 */
 	mutex_lock(&lower_dentry->d_inode->i_mutex);
+	if (current->mm)
+		down_write(&current->mm->mmap_sem);
 	err = notify_change(lower_dentry, &lower_ia, /* note: lower_ia */
 			NULL);
-	mutex_unlock(&lower_dentry->d_inode->i_mutex);
 	if (current->mm)
 		up_write(&current->mm->mmap_sem);
+	mutex_unlock(&lower_dentry->d_inode->i_mutex);
 	if (err)
 		goto out;
 

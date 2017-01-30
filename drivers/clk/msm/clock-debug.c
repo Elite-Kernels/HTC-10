@@ -719,6 +719,10 @@ int htc_clock_status_debug_init(struct clk_lookup *table, size_t size)
 }
 #endif
 
+/**
+ * clock_debug_init() - Initialize clock debugfs
+ * Lock clk_debug_lock before invoking this function.
+ */
 static int clock_debug_init(void)
 {
 	if (clk_debug_init_once)

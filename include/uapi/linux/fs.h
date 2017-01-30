@@ -62,17 +62,20 @@ struct inodes_stat_t {
 #define NR_FILE  8192	/* this can well be larger on a larger system */
 
 
-#define MS_RDONLY	 1	
-#define MS_NOSUID	 2	
-#define MS_NODEV	 4	
-#define MS_NOEXEC	 8	
-#define MS_SYNCHRONOUS	16	
-#define MS_REMOUNT	32	
-#define MS_MANDLOCK	64	
-#define MS_DIRSYNC	128	
-#define MS_EMERGENCY_RO	256 
-#define MS_NOATIME	1024	
-#define MS_NODIRATIME	2048	
+/*
+ * These are the fs-independent mount-flags: up to 32 flags are supported
+ */
+#define MS_RDONLY	 1	/* Mount read-only */
+#define MS_NOSUID	 2	/* Ignore suid and sgid bits */
+#define MS_NODEV	 4	/* Disallow access to device special files */
+#define MS_NOEXEC	 8	/* Disallow program execution */
+#define MS_SYNCHRONOUS	16	/* Writes are synced at once */
+#define MS_REMOUNT	32	/* Alter flags of a mounted FS */
+#define MS_MANDLOCK	64	/* Allow mandatory locks on an FS */
+#define MS_DIRSYNC	128	/* Directory modifications are synchronous */
+#define MS_EMERGENCY_RO	256 /* Reject write/unlink/rename after Emergency Remount starting */
+#define MS_NOATIME	1024	/* Do not update access times. */
+#define MS_NODIRATIME	2048	/* Do not update directory access times */
 #define MS_BIND		4096
 #define MS_MOVE		8192
 #define MS_REC		16384

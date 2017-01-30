@@ -2544,7 +2544,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		dump_stack();
 	}
 
-	
+	/* Page migration frees to the PCP lists but we want merging */
 	drain_pages(get_cpu());
 	put_cpu();
 
@@ -6035,6 +6035,30 @@ int vm_inactive_ratio_handler(struct ctl_table *table, int write,
 	}
 	return ret;
 }
+/*
+ * Initialise min_free_kbytes.
+ *
+ * For small machines we want it small (128k min).  For large machines
+ * we want it large (64MB max).  But it is not linear, because network
+ * bandwidth does not increase linearly with machine size.  We use
+ *
+ *	min_free_kbytes = 4 * sqrt(lowmem_kbytes), for better accuracy:
+ *	min_free_kbytes = sqrt(lowmem_kbytes * 16)
+ *
+ * which yields
+ *
+ * 16MB:	512k
+ * 32MB:	724k
+ * 64MB:	1024k
+ * 128MB:	1448k
+ * 256MB:	2048k
+ * 512MB:	2896k
+ * 1024MB:	4096k
+ * 2048MB:	5792k
+ * 4096MB:	8192k
+ * 8192MB:	11584k
+ * 16384MB:	16384k
+ */
 int __meminit init_per_zone_wmark_min(void)
 {
 	unsigned long lowmem_kbytes;

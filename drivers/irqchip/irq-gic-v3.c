@@ -459,12 +459,12 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 			int err;
 
 #if defined(CONFIG_HTC_DEBUG_WATCHDOG)
-			
+			/* only check on timer interrupt */
 			if (irqnr == 27 && smp_processor_id() == 0) {
 				unsigned long long timestamp = sched_clock();
 				htc_debug_watchdog_check_pet(timestamp);
 			}
-#endif 
+#endif /* CONFIG_HTC_DEBUG_WATCHDOG */
 			uncached_logk(LOGK_IRQ, (void *)(uintptr_t)irqnr);
 			err = handle_domain_irq(gic_data.domain, irqnr, regs);
 			if (err) {

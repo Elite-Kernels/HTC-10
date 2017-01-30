@@ -30,12 +30,14 @@
 
 #define WAKELOCK_TIMEOUT	5000
 
+//HTC_AUD_START
 #undef pr_debug
 #undef pr_info
 #undef pr_err
 #define pr_debug(fmt, ...) pr_aud_debug(fmt, ##__VA_ARGS__)
 #define pr_info(fmt, ...) pr_aud_info(fmt, ##__VA_ARGS__)
 #define pr_err(fmt, ...) pr_aud_err(fmt, ##__VA_ARGS__)
+//HTC_AUD_END
 
 enum {
 	AFE_COMMON_RX_CAL = 0,
@@ -873,9 +875,11 @@ static int afe_spk_ramp_dn_cfg(int port)
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n", __func__);
 		ret = -EINVAL;
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 		BUG();
 #endif
+//HTC_AUD_END
 		goto fail_cmd;
 	}
 	if (atomic_read(&this_afe.status) > 0) {
@@ -983,9 +987,11 @@ static int afe_spk_prot_prepare(int src_port, int dst_port, int param_id,
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n", __func__);
 		ret = -EINVAL;
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 		BUG();
 #endif
+//HTC_AUD_END
 		goto fail_cmd;
 	}
 	if (atomic_read(&this_afe.status) > 0) {
@@ -2068,9 +2074,11 @@ int afe_send_spdif_clk_cfg(struct afe_param_id_spdif_clk_cfg *cfg,
 		pr_err("%s: wait_event timeout\n",
 				__func__);
 		ret = -EINVAL;
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 		BUG();
 #endif
+//HTC_AUD_END
 		goto fail_cmd;
 	}
 	if (atomic_read(&this_afe.status) > 0) {
@@ -2150,9 +2158,11 @@ int afe_send_spdif_ch_status_cfg(struct afe_param_id_spdif_ch_status_cfg
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n",
 				__func__);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 		BUG();
 #endif
+//HTC_AUD_END
 		ret = -EINVAL;
 		goto fail_cmd;
 	}
@@ -3817,9 +3827,11 @@ int afe_cmd_memory_map(phys_addr_t dma_addr_p, u32 dma_buf_sz)
 				 msecs_to_jiffies(TIMEOUT_MS));
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n", __func__);
+//HTC_AUD_START
 #ifdef CONFIG_HTC_DEBUG_DSP
 		BUG();
 #endif
+//HTC_AUD_END
 		ret = -EINVAL;
 		goto fail_cmd;
 	}
@@ -4534,7 +4546,7 @@ static int afe_sidetone_iir(u16 tx_port_id, u16 rx_port_id, bool enable)
 	iir_sidetone.param.port_id = tx_port_id;
 	iir_sidetone.param.payload_address_lsw = 0x00;
 	iir_sidetone.param.payload_address_msw = 0x00;
-	iir_sidetone.param.mem_map_handle = 0x00;	
+	iir_sidetone.param.mem_map_handle = 0x00;	/* size of data param & payload */
 
 	if(this_afe.cal_data[cal_index]== NULL) {
 		pr_err( "%s cal data is wrong\n", __func__);
@@ -4554,9 +4566,15 @@ static int afe_sidetone_iir(u16 tx_port_id, u16 rx_port_id, bool enable)
         mid =  ((struct audio_cal_info_sidetone_iir *) cal_block->cal_info)->mid;
 
 
+	/* calculate the actual size of payload based on no of stages
+	 * enabled in calibration
+	 */
         size = (MAX_SIDETONE_IIR_DATA_SIZE / MAX_NO_IIR_FILTER_STAGE) *
 		iir_num_biquad_stages;
 
+	/* For an odd number of stages, 2 bytes of padding are
+	 * required at the end of the payload.
+	 */
 	if (iir_num_biquad_stages % 2) {
 		pr_debug("%s: adding 2 to size:%d\n", __func__, size);
 		size = size + 2;
@@ -4566,7 +4584,7 @@ static int afe_sidetone_iir(u16 tx_port_id, u16 rx_port_id, bool enable)
 
 	mutex_unlock(&this_afe.cal_data[cal_index]->lock);
 
-	
+	/* Calculate the payload size for the setparams command*/
 	iir_sidetone.param.payload_size = (sizeof(iir_sidetone) -
 				sizeof(struct apr_hdr) -
 				sizeof(struct afe_port_cmd_set_param_v2) -
@@ -4574,13 +4592,13 @@ static int afe_sidetone_iir(u16 tx_port_id, u16 rx_port_id, bool enable)
 
 	pr_debug("%s: payload size :%d\n", __func__,  iir_sidetone.param.payload_size);
 
-	
+	/* Setup IIR enable params*/
 	iir_sidetone.st_iir_enable_pdata.module_id = AFE_MODULE_SIDETONE_IIR_FILTER;
 	iir_sidetone.st_iir_enable_pdata.param_id = AFE_PARAM_ID_ENABLE;
 	iir_sidetone.st_iir_enable_pdata.param_size = sizeof(iir_sidetone.st_iir_mode_enable_data);
 	iir_sidetone.st_iir_mode_enable_data.enable = ((enable == true) ? iir_enable : 0);
 
-	
+	/* Setup IIR filter config params*/
 	iir_sidetone.st_iir_filter_config_pdata.module_id = AFE_MODULE_SIDETONE_IIR_FILTER;
 	iir_sidetone.st_iir_filter_config_pdata.param_id = AFE_PARAM_ID_SIDETONE_IIR_FILTER_CONFIG;
 	iir_sidetone.st_iir_filter_config_pdata.param_size = sizeof(iir_sidetone.st_iir_filter_config_data.num_biquad_stages) +
@@ -4661,14 +4679,14 @@ static int afe_sidetone(u16 tx_port_id, u16 rx_port_id, bool enable)
 
 	cmd_sidetone.gain_pdata.module_id = AFE_MODULE_LOOPBACK;
 	cmd_sidetone.gain_pdata.param_id = AFE_PARAM_ID_LOOPBACK_GAIN_PER_PATH;
-	
+	/* size of actual payload only */
 	cmd_sidetone.gain_pdata.param_size = sizeof(struct afe_loopback_sidetone_gain);
 	cmd_sidetone.gain_data.rx_port_id = rx_port_id;
 	cmd_sidetone.gain_data.gain = sidetone_gain;
 
 	cmd_sidetone.cfg_pdata.module_id = AFE_MODULE_LOOPBACK;
 	cmd_sidetone.cfg_pdata.param_id = AFE_PARAM_ID_LOOPBACK_CONFIG;
-	
+	/* size of actual payload only */
 	cmd_sidetone.cfg_pdata.param_size =  sizeof(struct loopback_cfg_data);
 	cmd_sidetone.cfg_data.loopback_cfg_minor_version =
 					AFE_API_VERSION_LOOPBACK_CONFIG;

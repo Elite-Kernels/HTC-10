@@ -33,6 +33,7 @@
 #include <linux/htc_flags.h>
 #include <linux/reboot.h>
 #endif
+#include <soc/qcom/rpm-smd.h>
 
 #include <../../power/reset/htc_restart_handler.h>
 
@@ -499,11 +500,17 @@ void qpnp_kick_s2_timer(void)
 {
 	if (qpnp_get_s2_en(PON_KPDPWR_RESIN) > 0) {
 		qpnp_config_s2_enable(PON_KPDPWR_RESIN, 0);
+		/*
+		  For reliable hardware operation, the minimum time allowed between
+		  write operations is 3 sleep clock cycles.
+		  30.5us * 3 = 91.6us < 100us
+		*/
 		udelay(100);
 		qpnp_config_s2_enable(PON_KPDPWR_RESIN, 1);
 		udelay(100);
 	}
 }
+/* Note: Please don't use this funciton at IRQ handler due to it has the udelay */
 EXPORT_SYMBOL(qpnp_kick_s2_timer);
 
 #define BOOST_STATUS		0xa008
@@ -594,7 +601,7 @@ int qpnp_pon_set_s3_timer(u32 s3_debounce)
 	int rc = 0;
 	struct qpnp_pon *pon = sys_reset_dev;
 
-	
+	/* s3 debounce is SEC_ACCESS register */
 	rc = qpnp_pon_masked_write(pon, QPNP_PON_SEC_ACCESS(pon),
 			0xFF, QPNP_PON_SEC_UNLOCK);
 	if (rc) {
@@ -603,7 +610,7 @@ int qpnp_pon_set_s3_timer(u32 s3_debounce)
 		return rc;
 	}
 
-	
+	/* set PM s3 debounce time */
 	rc = qpnp_pon_masked_write(pon, QPNP_PON_S3_DBC_CTL(pon),
 			QPNP_PON_S3_DBC_DELAY_MASK, s3_debounce);
 	if (rc) {
@@ -612,10 +619,10 @@ int qpnp_pon_set_s3_timer(u32 s3_debounce)
 		return rc;
 	}
 
-	
+	/* Requires 5 sleep clock cycles of delay at least */
 	udelay(200);
 
-	
+	/* s3 debounce is SEC_ACCESS register */
 	rc = qpnp_pon_masked_write_for_pmi(pon, QPNP_PON_SEC_ACCESS(pon),
 			0xFF, QPNP_PON_SEC_UNLOCK);
 	if (rc) {
@@ -624,7 +631,7 @@ int qpnp_pon_set_s3_timer(u32 s3_debounce)
 		return rc;
 	}
 
-	
+	/* set PMI s3 debounce time */
 	rc = qpnp_pon_masked_write_for_pmi(pon, QPNP_PON_S3_DBC_CTL(pon),
 			QPNP_PON_S3_DBC_DELAY_MASK, s3_debounce);
 	if (rc) {
@@ -633,7 +640,7 @@ int qpnp_pon_set_s3_timer(u32 s3_debounce)
 		return rc;
 	}
 
-	
+	/* Requires 5 sleep clock cycles of delay at least */
 	udelay(200);
 
 	return rc;
@@ -782,12 +789,12 @@ static int qpnp_pon_reset_config(struct qpnp_pon *pon,
 	 */
 	udelay(500);
 
-	if(pon->spmi->sid == 2 && is_pmi_ES())
+	if(pon->spmi->sid == 2 && is_pmi_ES())//Change PS_HOLD hard reset and shutdown to xVdd hard reset and shutdown
 	{
 		if(type == PON_POWER_OFF_HARD_RESET)
-			type = PON_POWER_OFF_xVDD_HARD_RESET;
+			type = PON_POWER_OFF_xVDD_HARD_RESET;//Change to xVdd hard reset for PMI
 		else if(type == PON_POWER_OFF_SHUTDOWN)
-			type = PON_POWER_OFF_xVDD_SHUTDOWN;
+			type = PON_POWER_OFF_xVDD_SHUTDOWN;//Change th xVdd shutdown for PMI
 	}
 
 	rc = qpnp_pon_masked_write(pon, QPNP_PON_PS_HOLD_RST_CTL(pon),
@@ -946,45 +953,45 @@ static int qpnp_pon_readl_for_pmi(struct qpnp_pon *pon, u16 addr, u8 *reg)
 
 static u8 htc_dump_pon_reg[] =
 {
-	0x40,	
-	0x41,	
-	0x42,	
-	0x43,	
-	0x44,	
-	0x45,	
-	0x46,	
-	0x47,	
-	0x48,	
-	0x49,	
-	0x4A,	
-	0x4B,	
-	0x4C,	
-	0x4D,	
-	0x4E,	
-	0x4F,	
-	0x50,	
-	0x51,	
-	0x52,	
-	0x53,	
-	0x54,	
-	0x55,	
-	0x56,	
-	0x57,	
-	0x58,	
-	0x5A,	
-	0x5B,	
-	0x62,	
-	0x63,	
-	0x64,	
-	0x66,	
-	0x67,	
-	0x70,	
-	0x71,	
-	0x74,	
-	0x75,	
-	0x80,	
-	0x83,	
-	0x88,	
+	0x40,	/* PON_KPDPWR_N_RESET_S1_TIMER */
+	0x41,	/* PON_KPDPWR_N_RESET_S2_TIMER */
+	0x42,	/* PON_KPDPWR_N_RESET_S2_CTL */
+	0x43,	/* PON_KPDPWR_N_RESET_S2_CTL2 */
+	0x44,	/* PON_RESIN_N_RESET_S1_TIMER */
+	0x45,	/* PON_RESIN_N_RESET_S2_TIMER */
+	0x46,	/* PON_RESIN_N_RESET_S2_CTL */
+	0x47,	/* PON_RESIN_N_RESET_S2_CTL2 */
+	0x48,	/* PON_RESIN_AND_KPDPWR_RESET_S1_TIMER */
+	0x49,	/* PON_RESIN_AND_KPDPWR_RESET_S2_TIMER */
+	0x4A,	/* PON_RESIN_AND_KPDPWR_RESET_S2_CTL */
+	0x4B,	/* PON_RESIN_AND_KPDPWR_RESET_S2_CTL2 */
+	0x4C,	/* PON_GP2_RESET_S1_TIMER */
+	0x4D,	/* PON_GP2_RESET_S2_TIMER */
+	0x4E,	/* PON_GP2_RESET_S2_CTL */
+	0x4F,	/* PON_GP2_RESET_S2_CTL2 */
+	0x50,	/* PON_GP1_RESET_S1_TIMER */
+	0x51,	/* PON_GP1_RESET_S2_TIMER */
+	0x52,	/* PON_GP1_RESET_S2_CTL */
+	0x53,	/* PON_GP1_RESET_S2_CTL2 */
+	0x54,	/* PON_PMIC_WD_RESET_S1_TIMER */
+	0x55,	/* PON_PMIC_WD_RESET_S2_TIMER */
+	0x56,	/* PON_PMIC_WD_RESET_S2_CTL */
+	0x57,	/* PON_PMIC_WD_RESET_S2_CTL2 */
+	0x58,	/* PON_PMIC_WD_RESET_PET */
+	0x5A,	/* PON_PS_HOLD_RESET_CTL */
+	0x5B,	/* PON_PS_HOLD_RESET_CTL2 */
+	0x62,	/* PON_SW_RESET_S2_CTL */
+	0x63,	/* PON_SW_RESET_S2_CTL2 */
+	0x64,	/* PON_SW_RESET_GO */
+	0x66,	/* PON_OVERTEMP_RESET_CTL */
+	0x67,	/* PON_OVERTEMP_RESET_CTL2 */
+	0x70,	/* PON_PULL_CTL */
+	0x71,	/* PON_DEBOUNCE_CTL */
+	0x74,	/* PON_RESET_S3_SRC */
+	0x75,	/* PON_RESET_S3_TIMER */
+	0x80,	/* PON_PON_TRIGGER_EN */
+	0x83,	/* PON_WATCHDOG_LOCK */
+	0x88,	/* PON_UVLO */
 	0xff
 };
 
@@ -1186,6 +1193,9 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	key_status = pon_rt_sts & pon_rt_bit;
 
 #ifdef CONFIG_QPNP_KEY_INPUT
+	/* simulate press event in case release event occured
+	 * without a press event
+	 */
 	if (!cfg->old_state && !key_status) {
 		input_report_key(pon->pon_input, cfg->key_code, 1);
 		input_sync(pon->pon_input);
@@ -1244,7 +1254,7 @@ struct pmic_dump_ranges {
 	}
 
 static struct pmic_dump_ranges htc_dump_ranges[] = {
-	
+	/* name, sid_sel, addr_start, length */
 	PMIC_REG_DUMP_RANGE("PM_PON", 0, 0x800,  0x91),
 	PMIC_REG_DUMP_RANGE("PMI_PON", 2, 0x800, 0x91),
 	PMIC_REG_DUMP_RANGE("PMI_Charger_1", 2, 0x1000,  0x4FF),
@@ -1257,7 +1267,7 @@ void pmic_reg_hexdump(unsigned char sid, unsigned short addr, unsigned int dump_
 {
 	struct qpnp_pon *pon = sys_reset_dev;
 	int i, buffer_size, end_col, rc = 0;
-	char buffer[DUMP_COLS * 4 + 9]; 
+	char buffer[DUMP_COLS * 4 + 9]; // register length: 4, address length: 9
 	unsigned char reg = 0;
 	ssize_t len, ret = 0;
 
@@ -1267,13 +1277,13 @@ void pmic_reg_hexdump(unsigned char sid, unsigned short addr, unsigned int dump_
 
 	for(i = 0; i < dump_len; i++)
 	{
-		
+		/* Show address offest */
 		if(i % DUMP_COLS == 0) {
 			len = snprintf(buffer + ret, buffer_size - ret, "0x%06x: ", addr + i);
 			ret += len;
 		}
 
-		
+		/* Query PMIC register data */
 		if(i < dump_len) {
 			rc = spmi_ext_register_readl(pon->spmi->ctrl, sid,
 					addr+i, &reg, 1);
@@ -1286,7 +1296,7 @@ void pmic_reg_hexdump(unsigned char sid, unsigned short addr, unsigned int dump_
 			ret += len;
 		}
 
-		
+		/* Print PMIC register data */
 		if(i % DUMP_COLS == end_col) {
 			printk(KERN_INFO "%s\n", buffer);
 			len = 0;
@@ -1317,14 +1327,14 @@ static irqreturn_t qpnp_kpdpwr_resin_bark_irq(int irq, void *_pon)
 	set_restart_action(RESTART_REASON_RAMDUMP, "Powerkey Hard Reset");
 #ifdef CONFIG_HTC_POWER_DEBUG
 	if (get_kernel_flag() & KERNEL_FLAG_PM_MONITOR) {
-		
+		/* 1. disable Stage 2 reset first */
 		if (qpnp_get_s2_en(PON_KPDPWR_RESIN) > 0)
 		qpnp_config_s2_enable(PON_KPDPWR_RESIN, 0);
 
-		
+		/* 2. Getting start to dump */
 		do_htc_pmic_reg_dump();
 
-		
+		/* 3. Trigger S/W reset */
 		machine_restart("force-dog-bark");
 	}
 #endif
@@ -1430,7 +1440,7 @@ static void bark_work_func(struct work_struct *work)
 
 	if (!(pon_rt_sts & QPNP_PON_RESIN_BARK_N_SET)) {
 #ifdef CONFIG_QPNP_KEY_INPUT
-		
+		/* report the key event and enable the bark IRQ */
 		input_report_key(pon->pon_input, cfg->key_code, 0);
 		input_sync(pon->pon_input);
 #endif
@@ -1475,11 +1485,11 @@ static irqreturn_t qpnp_resin_bark_irq(int irq, void *_pon)
 		goto err_exit;
 	}
 #ifdef CONFIG_QPNP_KEY_INPUT
-	
+	/* report the key event */
 	input_report_key(pon->pon_input, cfg->key_code, 1);
 	input_sync(pon->pon_input);
 #endif
-	
+	/* schedule work to check the bark status for key-release */
 	schedule_delayed_work(&pon->bark_work, QPNP_KEY_STATUS_DELAY);
 err_exit:
 	return IRQ_HANDLED;
@@ -1574,12 +1584,12 @@ qpnp_config_reset(struct qpnp_pon *pon, struct qpnp_pon_config *cfg)
 		return rc;
 	}
 
-	if(pon->spmi->sid == 2 && is_pmi_ES())
+	if(pon->spmi->sid == 2 && is_pmi_ES())//Change PS_HOLD hard reset and shutdown to xVdd hard reset and shutdown
 	{
 		if(cfg->s2_type == PON_POWER_OFF_HARD_RESET)
-			cfg->s2_type = PON_POWER_OFF_xVDD_HARD_RESET;
+			cfg->s2_type = PON_POWER_OFF_xVDD_HARD_RESET;//Change to xVdd hard reset for PMI
 		else if(cfg->s2_type == PON_POWER_OFF_SHUTDOWN)
-			cfg->s2_type = PON_POWER_OFF_xVDD_SHUTDOWN;
+			cfg->s2_type = PON_POWER_OFF_xVDD_SHUTDOWN;//Change th xVdd shutdown for PMI
 	}
 
 	rc = qpnp_pon_masked_write(pon, cfg->s2_cntl_addr,
@@ -1970,9 +1980,9 @@ static int qpnp_pon_config_init(struct qpnp_pon *pon)
 					"Incorrect reset type specified\n");
 				return -EINVAL;
 			}
-			
+			/* If radio flag is 0x8, let stage 2 reset type is warm reset */
 			if (get_radio_flag() & BIT(3))
-				cfg->s2_type = 1;
+				cfg->s2_type = 1;// 0x1: warm reset, 0x7: hard reset
 		}
 		/*
 		 * Get the standard-key parameters. This might not be
@@ -2231,24 +2241,24 @@ static int do_extend_s3_timer(const char *val, const struct kernel_param *kp)
 		return rc;
 	}
 
-	
+	/* do nothing, if the value is the same as the previous one */
 	if((*(bool *)kp->arg) == to_extend_s3_timer_z)
 		return 0;
 
 	if (*(bool *)kp->arg)
-		s3_debounce = ilog2(128); 
+		s3_debounce = ilog2(128); /* Set stage 3 timer as 128 sec */
 	else
-		s3_debounce = ilog2(32); 
+		s3_debounce = ilog2(32); /* Set stage 3 timer as 32 sec */
 
 
-	
+	/* Set PM/PMi S3 reset time */
 	rc = qpnp_pon_set_s3_timer(s3_debounce);
 	if (rc) {
 		pr_err("do_extend_s3_timer failed, %d\n", rc);
 		return rc;
 	}
 
-	
+	/* Update the previous state */
 	to_extend_s3_timer_z = to_extend_s3_timer;
 
 	return 0;
@@ -2507,6 +2517,47 @@ static int read_gen2_pon_off_reason(struct qpnp_pon *pon, u16 *reason,
 	}
 
 	return 0;
+}
+
+static int send_isRamdumpEnable_To_RPM(void)
+{
+	struct msm_rpm_request *rpm_req;
+	int ret = 0;
+	int msg_id, isRamdumpEnable = 0;
+
+	if (get_radio_flag() & BIT(3))
+		isRamdumpEnable = 1;
+	else // If ramdump debug mode is not enable, just return and do nothing.
+		return ret;
+
+	rpm_req = msm_rpm_create_request(MSM_RPM_CTX_ACTIVE_SET, RPM_HTC_CMD_REQ,
+					 RHCF_GENERIC_CMD, 1);
+	if (!rpm_req)
+		return -ENODEV;
+
+	ret = msm_rpm_add_kvp_data(rpm_req, RAMDUMP_MODE_PARA_ENABLE, (uint8_t *)&isRamdumpEnable,
+			     sizeof(int));
+	if (ret) {
+		printk(KERN_ERR "Adding KVP data failed. err:%d\n", ret);
+		goto free_rpm_handle;
+	}
+
+	msg_id = msm_rpm_send_request(rpm_req);
+	if (!msg_id) {
+		printk(KERN_ERR "RPM send request failed\n");
+		ret = -ENXIO;
+		goto free_rpm_handle;
+	}
+
+	ret = msm_rpm_wait_for_ack(msg_id);
+	if (ret) {
+		printk(KERN_ERR "RPM wait for ACK failed. err:%d\n", ret);
+		goto free_rpm_handle;
+	}
+
+free_rpm_handle:
+	msm_rpm_free_request(rpm_req);
+	return ret;
 }
 
 static int qpnp_pon_probe(struct spmi_device *spmi)
@@ -2862,6 +2913,7 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 					"qcom,store-hard-reset-reason");
 
 	qpnp_pon_debugfs_init(spmi);
+	send_isRamdumpEnable_To_RPM();
 	return 0;
 }
 
