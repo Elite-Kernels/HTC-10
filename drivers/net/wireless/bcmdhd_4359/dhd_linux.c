@@ -4082,12 +4082,19 @@ done:
 		}
 #endif /* TX_STUCK_DETECTION */
 		if (dhd->pub.xmit_count > 10 && ((((uint32)jiffies_to_msecs(jiffies)) - dhd->pub.xmit_record_time) > 10000)) {
-			DHD_ERROR(("%s tx stuck time > 10s, do recover\n", __FUNCTION__));
-			net_os_send_hang_message(net);
+			if (!dhd->pub.xmit_hang_possible) {
+				DHD_ERROR(("%s tx stuck time > 10s, flagging for possible recovery\n", __FUNCTION__));
+				dhd->pub.xmit_hang_possible = true;
+				dhd->pub.xmit_record_time = ((uint32)jiffies_to_msecs(jiffies));
+			} else {
+				DHD_ERROR(("%s tx stuck time > 10s, do recover\n", __FUNCTION__));
+				net_os_send_hang_message(net);
+			}
 		}
 	} else {
 		dhd->pub.xmit_count = 0;
 		dhd->pub.xmit_record_time = 0;
+		dhd->pub.xmit_hang_possible = false;
 	}
 	dhd->pub.old_tx_completed_count = dhd->pub.new_tx_completed_count;
 #endif /* CUSTOMER_HW_ONE */
@@ -5776,6 +5783,7 @@ dhd_stop(struct net_device *net)
 	dhd->pub.new_tx_completed_count = 0;
 	dhd->pub.xmit_count = 0;
 	dhd->pub.xmit_record_time = 0;
+	dhd->pub.xmit_hang_possible = false;
 	/* HTC_WIFI_END */
 	smp_mb();
 #endif /* CUSTOMER_HW_ONE */
@@ -5974,6 +5982,7 @@ dhd_open_retry:
 	dhd->pub.new_tx_completed_count = 0;
 	dhd->pub.xmit_count = 0;
 	dhd->pub.xmit_record_time = 0;
+	dhd->pub.xmit_hang_possible = false;
 	/* HTC_WIFI_END */
 #endif /* CUSTOMER_HW_ONE */
 	dhd->pub.dongle_trap_occured = 0;
