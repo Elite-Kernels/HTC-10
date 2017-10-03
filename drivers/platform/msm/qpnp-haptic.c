@@ -182,14 +182,12 @@
 
 u32 adjusted_lra_play_rate_code[ADJUSTED_LRA_PLAY_RATE_CODE_ARRSIZE];
 
-/* haptic debug register set */
 static u8 qpnp_hap_dbg_regs[] = {
 	0x0a, 0x0b, 0x0c, 0x46, 0x48, 0x4c, 0x4d, 0x4e, 0x4f, 0x51, 0x52, 0x53,
 	0x54, 0x55, 0x56, 0x57, 0x58, 0x5c, 0x5e, 0x60, 0x61, 0x62, 0x63, 0x64,
 	0x65, 0x66, 0x67, 0x70, 0xE3,
 };
 
-/* ramp up/down test sequence */
 static u8 qpnp_hap_ramp_test_data[] = {
 	0x0, 0x19, 0x32, 0x4C, 0x65, 0x7F, 0x65, 0x4C, 0x32, 0x19,
 	0x0, 0x99, 0xB2, 0xCC, 0xE5, 0xFF, 0xE5, 0xCC, 0xB2, 0x99,
@@ -207,7 +205,6 @@ static u8 qpnp_hap_ramp_test_data[] = {
 	0x0, 0x99, 0xB2, 0xCC, 0xE5, 0xFF, 0xE5, 0xCC, 0xB2, 0x99,
 };
 
-/* alternate max and min sequence */
 static u8 qpnp_hap_min_max_test_data[] = {
 	0x0, 0x7F, 0x0, 0xFF, 0x0, 0x7F, 0x0, 0xFF, 0x0, 0x7F, 0x0, 0xFF,
 	0x0, 0x7F, 0x0, 0xFF, 0x0, 0x7F, 0x0, 0xFF, 0x0, 0x7F, 0x0, 0xFF,
@@ -223,12 +220,6 @@ static u8 qpnp_hap_min_max_test_data[] = {
 	0x0, 0x7F, 0x0, 0xFF, 0x0, 0x7F, 0x0, 0xFF, 0x0, 0x7F, 0x0, 0xFF,
 };
 
-/*
- * auto resonance mode
- * ZXD - Zero Cross Detect
- * QWD - Quarter Wave Drive
- * ZXD_EOP - ZXD with End Of Pattern
- */
 enum qpnp_hap_auto_res_mode {
 	QPNP_HAP_AUTO_RES_NONE,
 	QPNP_HAP_AUTO_RES_ZXD,
@@ -237,7 +228,6 @@ enum qpnp_hap_auto_res_mode {
 	QPNP_HAP_AUTO_RES_ZXD_EOP,
 };
 
-/* high Z option lines */
 enum qpnp_hap_high_z {
 	QPNP_HAP_LRA_HIGH_Z_NONE,
 	QPNP_HAP_LRA_HIGH_Z_OPT1,
@@ -245,7 +235,6 @@ enum qpnp_hap_high_z {
 	QPNP_HAP_LRA_HIGH_Z_OPT3,
 };
 
-/* play modes */
 enum qpnp_hap_mode {
 	QPNP_HAP_DIRECT,
 	QPNP_HAP_BUFFER,
@@ -253,7 +242,6 @@ enum qpnp_hap_mode {
 	QPNP_HAP_PWM,
 };
 
-/* pwm channel info */
 struct qpnp_pwm_info {
 	struct pwm_device *pwm_dev;
 	u32 pwm_channel;
@@ -261,66 +249,6 @@ struct qpnp_pwm_info {
 	u32 period_us;
 };
 
-/*
- *  qpnp_hap - Haptic data structure
- *  @ spmi - spmi device
- *  @ hap_timer - hrtimer
- *  @ auto_res_err_poll_timer - hrtimer for auto-resonance error
- *  @ timed_dev - timed output device
- *  @ work - worker
- *  @ auto_res_err_work - correct auto resonance error
- *  @ sc_work - worker to handle short circuit condition
- *  @ pwm_info - pwm info
- *  @ lock - spin lock
- *  @ wf_lock - mutex lock for waveform
- *  @ init_drive_period_code - the initial lra drive period code
- *  @ drive_period_code_max_limit_percent_variation - maximum limit of
-      percentage variation of drive period code
- *  @ drive_period_code_min_limit_percent_variation - minimum limit og
-      percentage variation of drive period code
- *  @ drive_period_code_max_limit - calculated drive period code with
-      percentage variation on the higher side.
- *  @ drive_period_code_min_limit - calculated drive period code with
-      percentage variation on the lower side
- *  @ play_mode - play mode
- *  @ auto_res_mode - auto resonace mode
- *  @ lra_high_z - high z option line
- *  @ timeout_ms - max timeout in ms
- *  @ time_required_to_generate_back_emf_us - the time required for sufficient
-      back-emf to be generated for auto resonance to be successful
- *  @ vmax_mv - max voltage in mv
- *  @ ilim_ma - limiting current in ma
- *  @ sc_deb_cycles - short circuit debounce cycles
- *  @ int_pwm_freq_khz - internal pwm frequency in khz
- *  @ wave_play_rate_us - play rate for waveform
- *  @ ext_pwm_freq_khz - external pwm frequency in khz
- *  @ wave_rep_cnt - waveform repeat count
- *  @ wave_s_rep_cnt - waveform sample repeat count
- *  @ play_irq - irq for play
- *  @ sc_irq - irq for short circuit
- *  @ base - base address
- *  @ act_type - actuator type
- *  @ wave_shape - waveform shape
- *  @ wave_samp - array of wave samples
- *  @ shadow_wave_samp - shadow array of wave samples
- *  @ brake_pat - pattern for active breaking
- *  @ reg_en_ctl - enable control register
- *  @ reg_play - play register
- *  @ lra_res_cal_period - period for resonance calibration
- *  @ sc_duration - counter to determine the duration of short circuit condition
- *  @ state - current state of haptics
- *  @ use_play_irq - play irq usage state
- *  @ use_sc_irq - short circuit irq usage state
- *  @ wf_update - waveform update flag
- *  @ pwm_cfg_state - pwm mode configuration state
- *  @ buffer_cfg_state - buffer mode configuration state
- *  @ en_brake - brake state
- *  @ sup_brake_pat - support custom brake pattern
- *  @ correct_lra_drive_freq - correct LRA Drive Frequency
- *  @ misc_trim_error_rc19p2_clk_reg_present - if MISC Trim Error reg is present
- *  @ perform_lra_auto_resonance_search - whether lra auto resonance search
- *    algorithm should be performed or not.
- */
 struct qpnp_hap {
 	struct spmi_device *spmi;
 	struct regulator *vcc_pon;
@@ -399,7 +327,6 @@ static uint32_t sc_irq_count = 0;
 static struct qpnp_hap *ghap;
 static int qpnp_hap_switch(u8 vib_duration);
 
-/* helper to read a pmic register */
 static int qpnp_hap_read_reg(struct qpnp_hap *hap, u8 *data, u16 addr)
 {
 	int rc;
@@ -413,7 +340,6 @@ static int qpnp_hap_read_reg(struct qpnp_hap *hap, u8 *data, u16 addr)
 	return rc;
 }
 
-/* helper to write a pmic register */
 static int qpnp_hap_write_reg(struct qpnp_hap *hap, u8 *data, u16 addr)
 {
 	int rc;
@@ -428,7 +354,6 @@ static int qpnp_hap_write_reg(struct qpnp_hap *hap, u8 *data, u16 addr)
 	return rc;
 }
 
-/* helper to access secure registers */
 static int qpnp_hap_sec_access(struct qpnp_hap *hap)
 {
 	int rc;
@@ -450,7 +375,7 @@ static void qpnp_handle_sc_irq(struct work_struct *work)
 
 	qpnp_hap_read_reg(hap, &val, QPNP_HAP_STATUS(hap->base));
 
-	/* clear short circuit register */
+	
 	if (val & SC_FOUND_BIT) {
 		hap->sc_duration++;
 		reg = QPNP_HAP_SC_CLR;
@@ -468,7 +393,7 @@ static int qpnp_hap_mod_enable(struct qpnp_hap *hap, int on)
 		val |= QPNP_HAP_EN;
 	} else {
 		for (i = 0; i < QPNP_HAP_MAX_RETRIES; i++) {
-			/* wait for 4 cycles of play rate */
+			
 			unsigned long sleep_time =
 				QPNP_HAP_CYCLS * hap->wave_play_rate_us;
 
@@ -477,7 +402,7 @@ static int qpnp_hap_mod_enable(struct qpnp_hap *hap, int on)
 
 			dev_dbg(&hap->spmi->dev, "HAP_STATUS=0x%x\n", val);
 
-			/* wait for QPNP_HAP_CYCLS cycles of play rate */
+			
 			if (val & QPNP_HAP_STATUS_BUSY) {
 				usleep_range(sleep_time, sleep_time + 1);
 				if (hap->play_mode == QPNP_HAP_DIRECT ||
@@ -534,7 +459,6 @@ static int qpnp_hap_play(struct qpnp_hap *hap, int on)
 	return 0;
 }
 
-/* sysfs show debug registers */
 static ssize_t qpnp_hap_dump_regs_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -558,7 +482,6 @@ static ssize_t qpnp_hap_dump_regs_show(struct device *dev,
 	return count;
 }
 
-/* play irq handler */
 static irqreturn_t qpnp_hap_play_irq(int irq, void *_hap)
 {
 	struct qpnp_hap *hap = _hap;
@@ -567,7 +490,7 @@ static irqreturn_t qpnp_hap_play_irq(int irq, void *_hap)
 
 	mutex_lock(&hap->wf_lock);
 
-	/* Configure WAVE_SAMPLE1 to WAVE_SAMPLE8 register */
+	
 	for (i = 0; i < QPNP_HAP_WAV_SAMP_LEN && hap->wf_update; i++) {
 		reg = hap->wave_samp[i] = hap->shadow_wave_samp[i];
 		rc = qpnp_hap_write_reg(hap, &reg,
@@ -583,7 +506,6 @@ unlock:
 	return IRQ_HANDLED;
 }
 
-/* short circuit irq handler */
 static irqreturn_t qpnp_hap_sc_irq(int irq, void *_hap)
 {
 	struct qpnp_hap *hap = _hap;
@@ -591,7 +513,7 @@ static irqreturn_t qpnp_hap_sc_irq(int irq, void *_hap)
 	u8 disable_haptics = 0x00;
 	u8 val;
 
-	/* clear short circuit register */
+	
 	sc_irq_count++;
 	dev_dbg(&hap->spmi->dev, "Short circuit detected\n");
 
@@ -603,9 +525,6 @@ static irqreturn_t qpnp_hap_sc_irq(int irq, void *_hap)
 		else
 			hap->sc_duration = 0;
 	} else {
-		/* Disable haptics module if the duration of short circuit
-		 * exceeds the maximum limit (5 secs).
-		 */
 		rc = qpnp_hap_write_reg(hap, &disable_haptics,
 					QPNP_HAP_EN_CTL_REG(hap->base));
 		dev_err(&hap->spmi->dev,
@@ -615,13 +534,12 @@ static irqreturn_t qpnp_hap_sc_irq(int irq, void *_hap)
 	return IRQ_HANDLED;
 }
 
-/* configuration api for buffer mode */
 static int qpnp_hap_buffer_config(struct qpnp_hap *hap)
 {
 	u8 reg = 0;
 	int rc, i, temp;
 
-	/* Configure the WAVE_REPEAT register */
+	
 	if (hap->wave_rep_cnt < QPNP_HAP_WAV_REP_MIN)
 		hap->wave_rep_cnt = QPNP_HAP_WAV_REP_MIN;
 	else if (hap->wave_rep_cnt > QPNP_HAP_WAV_REP_MAX)
@@ -647,7 +565,7 @@ static int qpnp_hap_buffer_config(struct qpnp_hap *hap)
 	if (rc)
 		return rc;
 
-	/* Configure WAVE_SAMPLE1 to WAVE_SAMPLE8 register */
+	
 	for (i = 0, reg = 0; i < QPNP_HAP_WAV_SAMP_LEN; i++) {
 		reg = hap->wave_samp[i];
 		rc = qpnp_hap_write_reg(hap, &reg,
@@ -656,7 +574,7 @@ static int qpnp_hap_buffer_config(struct qpnp_hap *hap)
 			return rc;
 	}
 
-	/* setup play irq */
+	
 	if (hap->use_play_irq) {
 		rc = devm_request_threaded_irq(&hap->spmi->dev, hap->play_irq,
 			NULL, qpnp_hap_play_irq,
@@ -674,13 +592,12 @@ static int qpnp_hap_buffer_config(struct qpnp_hap *hap)
 	return 0;
 }
 
-/* configuration api for pwm */
 static int qpnp_hap_pwm_config(struct qpnp_hap *hap)
 {
 	u8 reg = 0;
 	int rc, temp;
 
-	/* Configure the EXTERNAL_PWM register */
+	
 	if (hap->ext_pwm_freq_khz <= QPNP_HAP_EXT_PWM_FREQ_25_KHZ) {
 		hap->ext_pwm_freq_khz = QPNP_HAP_EXT_PWM_FREQ_25_KHZ;
 		temp = 0;
@@ -718,12 +635,12 @@ static int qpnp_hap_pwm_config(struct qpnp_hap *hap)
 		return -EINVAL;
 	}
 
-	/* disable auto res for PWM mode */
+	
 	reg &= QPNP_HAP_EXT_PWM_DTEST_MASK;
 	temp = hap->ext_pwm_dtest_line << QPNP_HAP_EXT_PWM_DTEST_SHFT;
 	reg |= temp;
 
-	/* TEST2 is a secure access register */
+	
 	rc = qpnp_hap_sec_access(hap);
 	if (rc)
 		return rc;
@@ -747,7 +664,6 @@ static int qpnp_hap_pwm_config(struct qpnp_hap *hap)
 	return 0;
 }
 
-/* configuration api for play mode */
 static int qpnp_hap_play_mode_config(struct qpnp_hap *hap)
 {
 	u8 reg = 0;
@@ -764,6 +680,10 @@ static int qpnp_hap_play_mode_config(struct qpnp_hap *hap)
 		return rc;
 	return 0;
 }
+
+#if 1
+static u64 stored_vmax_mv = 0;
+#endif
 
 /* configuration api for max volatge */
 static int qpnp_hap_vmax_config(struct qpnp_hap *hap)
@@ -799,7 +719,6 @@ static int qpnp_hap_vmax_config(struct qpnp_hap *hap)
 	return 0;
 }
 
-/* configuration api for short circuit debounce */
 static int qpnp_hap_sc_deb_config(struct qpnp_hap *hap)
 {
 	u8 reg = 0;
@@ -825,7 +744,6 @@ static int qpnp_hap_sc_deb_config(struct qpnp_hap *hap)
 	return 0;
 }
 
-/* DT parsing api for buffer mode */
 static int qpnp_hap_parse_buffer_dt(struct qpnp_hap *hap)
 {
 	struct spmi_device *spmi = hap->spmi;
@@ -878,7 +796,6 @@ static int qpnp_hap_parse_buffer_dt(struct qpnp_hap *hap)
 	return 0;
 }
 
-/* DT parsing api for PWM mode */
 static int qpnp_hap_parse_pwm_dt(struct qpnp_hap *hap)
 {
 	struct spmi_device *spmi = hap->spmi;
@@ -935,7 +852,6 @@ static int qpnp_hap_parse_pwm_dt(struct qpnp_hap *hap)
 	return 0;
 }
 
-/* sysfs show for wave samples */
 static ssize_t qpnp_hap_wf_samp_show(struct device *dev, char *buf, int index)
 {
 	struct timed_output_dev *timed_dev = dev_get_drvdata(dev);
@@ -999,7 +915,6 @@ static ssize_t qpnp_hap_wf_s7_show(struct device *dev,
 	return qpnp_hap_wf_samp_show(dev, buf, 7);
 }
 
-/* sysfs store for wave samples */
 static ssize_t qpnp_hap_wf_samp_store(struct device *dev,
 		const char *buf, size_t count, int index)
 {
@@ -1073,7 +988,6 @@ static ssize_t qpnp_hap_wf_s7_store(struct device *dev,
 	return qpnp_hap_wf_samp_store(dev, buf, count, 7);
 }
 
-/* sysfs show for wave form update */
 static ssize_t qpnp_hap_wf_update_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1084,7 +998,6 @@ static ssize_t qpnp_hap_wf_update_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", hap->wf_update);
 }
 
-/* sysfs store for updating wave samples */
 static ssize_t qpnp_hap_wf_update_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1099,7 +1012,6 @@ static ssize_t qpnp_hap_wf_update_store(struct device *dev,
 	return count;
 }
 
-/* sysfs show for wave repeat */
 static ssize_t qpnp_hap_wf_rep_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1110,7 +1022,6 @@ static ssize_t qpnp_hap_wf_rep_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", hap->wave_rep_cnt);
 }
 
-/* sysfs store for wave repeat */
 static ssize_t qpnp_hap_wf_rep_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1145,7 +1056,6 @@ static ssize_t qpnp_hap_wf_rep_store(struct device *dev,
 	return count;
 }
 
-/* sysfs show for wave samples repeat */
 static ssize_t qpnp_hap_wf_s_rep_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1156,7 +1066,6 @@ static ssize_t qpnp_hap_wf_s_rep_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", hap->wave_s_rep_cnt);
 }
 
-/* sysfs store for wave samples repeat */
 static ssize_t qpnp_hap_wf_s_rep_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1191,7 +1100,6 @@ static ssize_t qpnp_hap_wf_s_rep_store(struct device *dev,
 	return count;
 }
 
-/* sysfs store function for play mode*/
 static ssize_t qpnp_hap_play_mode_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1243,7 +1151,7 @@ static ssize_t qpnp_hap_play_mode_store(struct device *dev,
 
 	old_mode = hap->play_mode;
 	hap->play_mode = temp;
-	/* Configure the PLAY MODE register */
+	
 	rc = qpnp_hap_play_mode_config(hap);
 	if (rc) {
 		hap->play_mode = old_mode;
@@ -1261,7 +1169,6 @@ static ssize_t qpnp_hap_play_mode_store(struct device *dev,
 	return count;
 }
 
-/* sysfs show function for play mode */
 static ssize_t qpnp_hap_play_mode_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1283,7 +1190,6 @@ static ssize_t qpnp_hap_play_mode_show(struct device *dev,
 
 	return snprintf(buf, PAGE_SIZE, "%s\n", str);
 }
-/* sysfs show for voltage_level */
 static ssize_t qpnp_hap_voltage_level_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1294,7 +1200,6 @@ static ssize_t qpnp_hap_voltage_level_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "[VIB] voltage input:%dmV\n", hap->vmax_mv);
 }
 
-/* sysfs store for voltage_level */
 static ssize_t qpnp_hap_voltage_level_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1305,8 +1210,10 @@ static ssize_t qpnp_hap_voltage_level_store(struct device *dev,
 
 	input = simple_strtoul(buf, NULL, 10);
 	hap->vmax_mv = input;
-	hap->short_vmax = input;
 
+#if 1
+	stored_vmax_mv = hap->vmax_mv;
+#endif
 	rc = qpnp_hap_vmax_config(hap);
 	if (rc < 0)
 		VIB_ERR_LOG("qpnp_hap_vmax_config set failed(%d)", rc);
@@ -1314,7 +1221,6 @@ static ssize_t qpnp_hap_voltage_level_store(struct device *dev,
 	return count;
 }
 
-/* sysfs store for ramp test data */
 static ssize_t qpnp_hap_min_max_test_data_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1341,7 +1247,6 @@ static ssize_t qpnp_hap_min_max_test_data_store(struct device *dev,
 	return count;
 }
 
-/* sysfs show function for min max test data */
 static ssize_t qpnp_hap_min_max_test_data_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1360,7 +1265,6 @@ static ssize_t qpnp_hap_min_max_test_data_show(struct device *dev,
 
 }
 
-/* sysfs store for ramp test data */
 static ssize_t qpnp_hap_ramp_test_data_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1387,7 +1291,6 @@ static ssize_t qpnp_hap_ramp_test_data_store(struct device *dev,
 	return count;
 }
 
-/* sysfs show function for ramp test data */
 static ssize_t qpnp_hap_ramp_test_data_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1406,7 +1309,6 @@ static ssize_t qpnp_hap_ramp_test_data_show(struct device *dev,
 
 }
 
-/* sysfs attributes */
 static struct device_attribute qpnp_hap_attrs[] = {
 	__ATTR(wf_s0, (S_IRUGO | S_IWUSR | S_IWGRP),
 			qpnp_hap_wf_s0_show,
@@ -1531,7 +1433,7 @@ static int qpnp_hap_auto_res_enable(struct qpnp_hap *hap, int enable)
 	else
 		val |= AUTO_RES_DISABLE;
 
-	/* TEST2 is a secure access register */
+	
 	rc = qpnp_hap_sec_access(hap);
 	if (rc)
 		return rc;
@@ -1560,12 +1462,6 @@ static void update_lra_frequency(struct qpnp_hap *hap)
 		"lra_auto_res_lo = 0x%x lra_auto_res_hi = 0x%x play_rate_code = 0x%x\n",
 		lra_auto_res_lo, lra_auto_res_hi, play_rate_code);
 
-	/*
-	 * If the drive period code read from AUTO RES_LO and AUTO_RES_HI
-	 * registers is more than the max limit percent variation read from
-	 * DT or less than the min limit percent variation read from DT, then
-	 * RATE_CFG registers are not uptdated.
-	 */
 
 	if ((play_rate_code <= hap->drive_period_code_min_limit) ||
 		(play_rate_code >= hap->drive_period_code_max_limit))
@@ -1645,7 +1541,6 @@ static void correct_auto_res_error(struct work_struct *auto_res_err_work)
 	}
 }
 
-/* set api for haptics */
 static int qpnp_hap_set(struct qpnp_hap *hap, int on)
 {
 	int rc = 0;
@@ -1661,18 +1556,6 @@ static int qpnp_hap_set(struct qpnp_hap *hap, int on)
 	} else if (hap->play_mode == QPNP_HAP_BUFFER ||
 			hap->play_mode == QPNP_HAP_DIRECT) {
 		if (on) {
-			/*
-			 * For auto resonance detection to work properly,
-			 * sufficient back-emf has to be generated. In general,
-			 * back-emf takes some time to build up. When the auto
-			 * resonance mode is chosen as QWD, high-z will be
-			 * applied for every LRA cycle and hence there won't be
-			 * enough back-emf at the start-up. Hence, the motor
-			 * needs to vibrate for few LRA cycles after the PLAY
-			 * bit is asserted. So disable the auto resonance here
-			 * and enable it after the sleep of
-			 * 'time_required_to_generate_back_emf_us' is completed.
-			 */
 			if ((hap->act_type == QPNP_HAP_LRA) &&
 				(hap->correct_lra_drive_freq ||
 				hap->auto_res_mode == QPNP_HAP_AUTO_RES_QWD))
@@ -1695,9 +1578,6 @@ static int qpnp_hap_set(struct qpnp_hap *hap, int on)
 			}
 			if (hap->act_type == QPNP_HAP_LRA &&
 						hap->correct_lra_drive_freq) {
-				/*
-				 * Start timer to poll Auto Resonance error bit
-				 */
 				spin_lock(&hap->lock);
 				hrtimer_cancel(&hap->auto_res_err_poll_timer);
 				hrtimer_start(&hap->auto_res_err_poll_timer,
@@ -1729,7 +1609,39 @@ static int qpnp_hap_set(struct qpnp_hap *hap, int on)
 	return rc;
 }
 
-extern void register_haptic(int value);
+#if 1
+
+#define VMAX_MV_NOTIFICATION QPNP_HAP_VMAX_MAX_MV-200
+#define MIN_TD_VALUE_NOTIFICATION 100
+// sense framework based values, 1000 for call, 500 for alarm
+#define MIN_TD_VALUE_NOTIFICATION_CALL 1000
+#define MIN_TD_VALUE_NOTIFICATION_ALARM 500
+
+static int notification_booster = 2;
+static int suspend_booster = 0;
+static int vmax_needs_reset = 0;
+static int alarm_value_counter = 0;
+static int last_value = 0;
+static unsigned long last_alarm_value_jiffies = 0;
+
+void set_suspend_booster(int value) {
+	suspend_booster = !!value;
+}
+EXPORT_SYMBOL(set_suspend_booster);
+
+void set_notification_booster(int value) {
+	notification_booster = value;
+}
+EXPORT_SYMBOL(set_notification_booster);
+int get_notification_booster(void) {
+	return notification_booster;
+}
+EXPORT_SYMBOL(get_notification_booster);
+
+extern int register_haptic(int value);
+extern int input_is_screen_on(void);
+int skip_register_haptic = 0;
+#endif
 
 /* enable interface from timed output class */
 static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
@@ -1755,7 +1667,66 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 	} else {
 		VIB_INFO_LOG("en=%d\n", value);
 #if 1
-		register_haptic(value);
+		if (!skip_register_haptic) {
+			value = register_haptic(value);
+			VIB_INFO_LOG("new en=%d\n", value);
+		}
+
+		// if booster, and screen is off, or call or alarm value for timed device, then we may need a boosting...
+		if (!suspend_booster && notification_booster && (!input_is_screen_on() || value == MIN_TD_VALUE_NOTIFICATION_CALL || value == MIN_TD_VALUE_NOTIFICATION_ALARM) ) {
+			if (value>=MIN_TD_VALUE_NOTIFICATION) {
+				// detect repeating alarm... if it's not repeating frequently, then it can be some other apps vibration with its length value
+				if (input_is_screen_on() && value == MIN_TD_VALUE_NOTIFICATION_ALARM) {
+					VIB_INFO_LOG("alarm counting #1\n");
+					// if last vibration was not the same length, no repetition, reset counter and goto reset voltage...
+					if (last_value != value) {
+						VIB_INFO_LOG("alarm counting #2\n");
+						alarm_value_counter = 0;
+						goto reset;
+					} else {
+						if (value == MIN_TD_VALUE_NOTIFICATION_ALARM) {
+							unsigned int diff_jiffies = jiffies - last_alarm_value_jiffies;
+							last_alarm_value_jiffies = jiffies;
+							// if time difference is short enough...
+							VIB_INFO_LOG("alarm counting #3 diff jiffies %u\n",diff_jiffies);
+							if (diff_jiffies < 107 && diff_jiffies > 97) { // exact time matching to be precise...
+								//... raise counter
+								alarm_value_counter++;
+								// if not reaching yet enough repetition goto reset yet...
+								VIB_INFO_LOG("alarm counting #4 counter %d\n",alarm_value_counter);
+								if (alarm_value_counter <= 1) goto reset;
+								// otherwise will go into boosting...
+							} else {
+								// too much apart in time...not repetition, reset counter and go to reset voltage...
+								VIB_INFO_LOG("alarm counting #5\n");
+								alarm_value_counter = 0;
+								goto reset;
+							}
+						}
+					}
+				} else {
+					// not screen on, or not alarm, reset alarm repetition counter...
+					alarm_value_counter = 0;
+				}
+				if (!vmax_needs_reset) {
+					u32 new_val = stored_vmax_mv * (notification_booster+1);
+					if (new_val > VMAX_MV_NOTIFICATION) new_val = VMAX_MV_NOTIFICATION;
+					if (stored_vmax_mv > new_val) { goto skip_reset; } // stored value is higher than boosted notif MV then use stored in the end...
+					hap->vmax_mv = new_val;
+					qpnp_hap_vmax_config(hap);
+					vmax_needs_reset = 1;
+				}
+				goto skip_reset; // this time skip reset part!
+			}
+		}
+reset:
+		if (vmax_needs_reset) {
+			hap->vmax_mv = stored_vmax_mv;
+			qpnp_hap_vmax_config(hap);
+			vmax_needs_reset = 0;
+		}
+skip_reset:
+		last_value = value;
 #endif
 		value = (value > hap->timeout_ms ?
 				 hap->timeout_ms : value);
@@ -1764,12 +1735,6 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 			if((hap->last_set != current_set) || (hap->last_set == SPMI_WRITE_FAIL))
 				qpnp_hap_switch(current_set);
 		}
-
-		if (hap->vmax_mv == QPNP_HAP_VMAX_MIN_MV) {
-			spin_unlock(&hap->lock);
-			return;
-		}
-
 		hap->state = 1;
 		hrtimer_start(&hap->hap_timer,
 			      ktime_set(value / 1000, (value % 1000) * 1000000),
@@ -1778,6 +1743,41 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 	spin_unlock(&hap->lock);
 	schedule_work(&hap->work);
 }
+
+
+void set_vibrate(int value)
+{
+	qpnp_hap_td_enable(&ghap->timed_dev, value);
+}
+
+#if 1
+
+void boosted_vib(int time) {
+	u32 current_vmax_mv = ghap->vmax_mv;
+	int rc;
+	int counter = 1;
+	int voltage_step = 0;
+
+	while (counter-->0) {
+		ghap->vmax_mv = QPNP_HAP_VMAX_MAX_MV - voltage_step;
+		voltage_step += 800; // decrease voltage by each buzz..
+		rc = qpnp_hap_vmax_config(ghap);
+
+		// buzz...
+		skip_register_haptic = 1;
+		set_vibrate(time);
+		skip_register_haptic = 0;
+		msleep(time);
+
+		// wait a bit
+		msleep(time/2);
+	}
+	ghap->vmax_mv = current_vmax_mv;
+	rc = qpnp_hap_vmax_config(ghap);
+}
+EXPORT_SYMBOL(boosted_vib);
+#endif
+
 
 /* play pwm bytes */
 int qpnp_hap_play_byte(u8 data, bool on)
@@ -1800,19 +1800,14 @@ int qpnp_hap_play_byte(u8 data, bool on)
 		return rc;
 
 	if (!on) {
-		/* set the pwm back to original duty for normal operations */
-		/* this is not required if standard interface is not used */
+		
+		
 		rc = pwm_config(hap->pwm_info.pwm_dev,
 				hap->pwm_info.duty_us * NSEC_PER_USEC,
 				hap->pwm_info.period_us * NSEC_PER_USEC);
 		return rc;
 	}
 
-	/* pwm values range from 0x00 to 0xff. The range from 0x00 to 0x7f
-	   provides a postive amplitude in the sin wave form for 0 to 100%.
-	   The range from 0x80 to 0xff provides a negative amplitude in the
-	   sin wave form for 0 to 100%. Here the duty percentage is calculated
-	   based on the incoming data to accommodate this. */
 	if (data <= QPNP_HAP_EXT_PWM_PEAK_DATA)
 		duty_percent = QPNP_HAP_EXT_PWM_HALF_DUTY +
 			((data * QPNP_HAP_EXT_PWM_DATA_FACTOR) / 100);
@@ -1836,7 +1831,6 @@ int qpnp_hap_play_byte(u8 data, bool on)
 }
 EXPORT_SYMBOL(qpnp_hap_play_byte);
 
-/* worker to opeate haptics */
 static void qpnp_hap_worker(struct work_struct *work)
 {
 	struct qpnp_hap *hap = container_of(work, struct qpnp_hap,
@@ -1851,9 +1845,6 @@ static void qpnp_hap_worker(struct work_struct *work)
 				 __func__);
 	}
 
-	/* Disable haptics module if the duration of short circuit
-	 * exceeds the maximum limit (5 secs).
-	 */
 	if (hap->sc_duration == SC_MAX_DURATION) {
 		rc = qpnp_hap_write_reg(hap, &val,
 				QPNP_HAP_EN_CTL_REG(hap->base));
@@ -1871,7 +1862,6 @@ static void qpnp_hap_worker(struct work_struct *work)
 	}
 }
 
-/* get time api to know the remaining time */
 static int qpnp_hap_get_time(struct timed_output_dev *dev)
 {
 	struct qpnp_hap *hap = container_of(dev, struct qpnp_hap,
@@ -1885,7 +1875,6 @@ static int qpnp_hap_get_time(struct timed_output_dev *dev)
 	}
 }
 
-/* hrtimer function handler */
 static enum hrtimer_restart qpnp_hap_timer(struct hrtimer *timer)
 {
 	struct qpnp_hap *hap = container_of(timer, struct qpnp_hap,
@@ -1897,7 +1886,6 @@ static enum hrtimer_restart qpnp_hap_timer(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
-/* hrtimer function handler */
 static enum hrtimer_restart qpnp_hap_test_timer(struct hrtimer *timer)
 {
 	struct qpnp_hap *hap = container_of(timer, struct qpnp_hap,
@@ -1908,7 +1896,6 @@ static enum hrtimer_restart qpnp_hap_test_timer(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
-/* suspend routines to turn off haptics */
 #ifdef CONFIG_PM
 static int qpnp_haptic_suspend(struct device *dev)
 {
@@ -1922,7 +1909,7 @@ static int qpnp_haptic_suspend(struct device *dev)
 
 	hrtimer_cancel(&hap->hap_timer);
 	cancel_work_sync(&hap->work);
-	/* turn-off haptic */
+	
 	qpnp_hap_set(hap, 0);
 
 	return 0;
@@ -1958,13 +1945,13 @@ static int qpnp_hap_switch(u8 vib_duration) {
 		if (rc)
 			goto SPMI_ERROR;
 
-		//read long vibration register2 high bits
+		
 		rc = qpnp_hap_read_reg(hap, &temp,
 			QPNP_HAP_RATE_CFG2_REG(hap->base));
 		if (rc < 0)
 			goto SPMI_ERROR;
 
-		//cal long vibration register2 parameter
+		
 		temp &= QPNP_HAP_RATE_CFG2_MASK;
 		hap->long_freq_register2 |= temp;
 
@@ -1980,13 +1967,13 @@ static int qpnp_hap_switch(u8 vib_duration) {
 		if (rc)
 			goto SPMI_ERROR;
 
-		//read short vibration register2 high bits
+		
 		rc = qpnp_hap_read_reg(hap, &temp,
 			QPNP_HAP_RATE_CFG2_REG(hap->base));
 		if (rc < 0)
 			goto SPMI_ERROR;
 
-		//cal short vibration register2 parameter
+		
 		temp &= QPNP_HAP_RATE_CFG2_MASK;
 		hap->short_freq_register2 |= temp;
 
@@ -2004,19 +1991,15 @@ SPMI_ERROR:
 	return rc;
 }
 
-/* Configuration api for haptics registers */
 static int qpnp_hap_config(struct qpnp_hap *hap)
 {
 	u8 reg = 0, error_code = 0, unlock_val;
 	u32 temp, temp2;
 	int rc, i;
 
-	/*
-	 * This denotes the percentage error in rc clock multiplied by 10
-	 */
 	u8 rc_clk_err_percent_x10;
 
-	/* Configure the ACTUATOR TYPE register */
+	
 	rc = qpnp_hap_read_reg(hap, &reg, QPNP_HAP_ACT_TYPE_REG(hap->base));
 	if (rc < 0)
 		return rc;
@@ -2026,7 +2009,7 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 	if (rc)
 		return rc;
 
-	/* Configure auto resonance parameters */
+	
 	if (hap->act_type == QPNP_HAP_LRA) {
 		if (hap->lra_res_cal_period < QPNP_HAP_RES_CAL_PERIOD_MIN)
 			hap->lra_res_cal_period = QPNP_HAP_RES_CAL_PERIOD_MIN;
@@ -2049,7 +2032,7 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 		if (rc)
 			return rc;
 	} else {
-		/* disable auto resonance for ERM */
+		
 		reg = 0x00;
 
 		rc = qpnp_hap_write_reg(hap, &reg,
@@ -2058,17 +2041,20 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 			return rc;
 	}
 
-	/* Configure the PLAY MODE register */
+	
 	rc = qpnp_hap_play_mode_config(hap);
 	if (rc)
 		return rc;
 
+#if 1
+	stored_vmax_mv = hap->vmax_mv;
+#endif
 	/* Configure the VMAX register */
 	rc = qpnp_hap_vmax_config(hap);
 	if (rc)
 		return rc;
 
-	/* Configure the ILIM register */
+	
 	if (hap->ilim_ma < QPNP_HAP_ILIM_MIN_MA)
 		hap->ilim_ma = QPNP_HAP_ILIM_MIN_MA;
 	else if (hap->ilim_ma > QPNP_HAP_ILIM_MAX_MA)
@@ -2084,12 +2070,12 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 	if (rc)
 		return rc;
 
-	/* Configure the short circuit debounce register */
+	
 	rc = qpnp_hap_sc_deb_config(hap);
 	if (rc)
 		return rc;
 
-	/* Configure the INTERNAL_PWM register */
+	
 	if (hap->int_pwm_freq_khz <= QPNP_HAP_INT_PWM_FREQ_253_KHZ) {
 		hap->int_pwm_freq_khz = QPNP_HAP_INT_PWM_FREQ_253_KHZ;
 		temp = 0;
@@ -2122,7 +2108,7 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 	if (rc)
 		return rc;
 
-	/* Configure the WAVE SHAPE register */
+	
 	rc = qpnp_hap_read_reg(hap, &reg,
 			QPNP_HAP_WAV_SHAPE_REG(hap->base));
 	if (rc < 0)
@@ -2134,9 +2120,7 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 	if (rc)
 		return rc;
 
-	/* Configure RATE_CFG1 and RATE_CFG2 registers */
-	/* Note: For ERM these registers act as play rate and
-	   for LRA these represent resonance period */
+	
 	if (hap->wave_play_rate_us < QPNP_HAP_WAV_PLAY_RATE_US_MIN)
 		hap->wave_play_rate_us = QPNP_HAP_WAV_PLAY_RATE_US_MIN;
 	else if (hap->wave_play_rate_us > QPNP_HAP_WAV_PLAY_RATE_US_MAX)
@@ -2152,19 +2136,9 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 
 	temp2 = hap->short_play_rate_us / QPNP_HAP_RATE_CFG_STEP_US;
 
-	/*
-	 * The frequency of 19.2Mzhz RC clock is subject to variation. Currently
-	 * a few PMI modules have MISC_TRIM_ERROR_RC19P2_CLK register
-	 * present in their MISC  block. This register holds the frequency error
-	 * in 19.2Mhz RC clock.
-	 */
 	if (hap->act_type == QPNP_HAP_LRA
 			&& hap->misc_trim_error_rc19p2_clk_reg_present) {
 		unlock_val = MISC_SEC_UNLOCK;
-		/*
-		 * This SID value may change depending on the PMI chip where
-		 * the MISC block is present.
-		 */
 		rc = spmi_ext_register_writel(hap->spmi->ctrl,
 				PMI8950_MISC_SID, MISC_SEC_ACCESS,
 				&unlock_val, 1);
@@ -2176,10 +2150,6 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 			 MISC_TRIM_ERROR_RC19P2_CLK, &error_code, 1);
 		dev_dbg(&hap->spmi->dev, "TRIM register = 0x%x\n", error_code);
 
-		/*
-		 * Extract the 4 LSBs and multiply by 7 to get
-		 * the %error in RC clock multiplied by 10
-		 */
 		rc_clk_err_percent_x10 = (error_code & 0x0F) * 7;
 
 		/*
@@ -2242,7 +2212,7 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 				hap->drive_period_code_min_limit);
 	}
 
-	/* Configure BRAKE register */
+	
 	rc = qpnp_hap_read_reg(hap, &reg, QPNP_HAP_EN_CTL2_REG(hap->base));
 	if (rc < 0)
 		return rc;
@@ -2264,13 +2234,13 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 			return rc;
 	}
 
-	/* Cache enable control register */
+	
 	rc = qpnp_hap_read_reg(hap, &reg, QPNP_HAP_EN_CTL_REG(hap->base));
 	if (rc < 0)
 		return rc;
 	hap->reg_en_ctl = reg;
 
-	/* Cache play register */
+	
 	rc = qpnp_hap_read_reg(hap, &reg, QPNP_HAP_PLAY_REG(hap->base));
 	if (rc < 0)
 		return rc;
@@ -2286,7 +2256,7 @@ static int qpnp_hap_config(struct qpnp_hap *hap)
 	if (rc)
 		return rc;
 
-	/* setup short circuit irq */
+	
 	if (hap->use_sc_irq) {
 		rc = devm_request_threaded_irq(&hap->spmi->dev, hap->sc_irq,
 			NULL, qpnp_hap_sc_irq,
@@ -2318,7 +2288,6 @@ static void qpnp_vib_trigger_enable(struct vib_trigger_enabler *enabler, int val
 }
 #endif
 
-/* DT parsing for haptics parameters */
 static int qpnp_hap_parse_dt(struct qpnp_hap *hap)
 {
 	struct spmi_device *spmi = hap->spmi;
@@ -2638,7 +2607,7 @@ static int qpnp_haptic_probe(struct spmi_device *spmi)
 		dev_err(&spmi->dev, "hap config failed\n");
 		return rc;
 	}
-	hap->last_set = LONG_DURATION;		//set vibration to long vibrate because qpnp_hap_config was finished without error
+	hap->last_set = LONG_DURATION;		
 
 	spin_lock_init(&hap->lock);
 	mutex_init(&hap->wf_lock);
