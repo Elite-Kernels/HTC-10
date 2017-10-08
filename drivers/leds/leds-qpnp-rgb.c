@@ -25,7 +25,6 @@
 #include <linux/qpnp/pwm.h>
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
-/*#include <linux/android_alarm.h>*/
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
@@ -85,10 +84,6 @@
 
 #define MPP_SOURCE_DTEST1		0x08
 
-/**
- * enum qpnp_leds - QPNP supported led ids
- * @QPNP_ID_WLED - White led backlight
- */
 #define LED_DBG(fmt, ...) \
 		({ if (0) printk(KERN_DEBUG "[LED]" fmt, ##__VA_ARGS__); })
 #define LED_INFO(fmt, ...) \
@@ -243,11 +238,6 @@ struct mpp_config_data {
 	u8 blink_mode;
 };
 
-/**
- *  rgb_config_data - rgb configuration data
- *  @pwm_cfg - device pwm configuration
- *  @enable - bits to enable led
- */
 struct rgb_config_data {
 	struct pwm_config_data	*pwm_cfg;
 	u8	enable;
@@ -307,6 +297,7 @@ static struct workqueue_struct *g_led_on_work_queue;
 static struct qpnp_led_data *g_led_red = NULL, *g_led_green = NULL, *g_led_blue = NULL, *g_led_virtual = NULL;
 
 
+static uint16_t current_off_timer = 0;
 static int current_blink = 0;
 static int table_level_num = 0;
 static DEFINE_MUTEX(flash_lock);
@@ -982,7 +973,7 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 			}
 		}
 		if (led->mpp_cfg->pwm_mode == PWM_MODE) {
-			/*config pwm for brightness scaling*/
+			
 			period_us = led->mpp_cfg->pwm_cfg->pwm_period_us;
 			if (period_us > INT_MAX / NSEC_PER_USEC) {
 				duty_us = (period_us * led->cdev.brightness) /
@@ -1027,11 +1018,6 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 			if (led->cdev.brightness < LED_MPP_CURRENT_MIN)
 				led->cdev.brightness = LED_MPP_CURRENT_MIN;
 			else {
-				/*
-				 * PMIC supports LED intensity from 5mA - 40mA
-				 * in steps of 5mA. Brightness is rounded to
-				 * 5mA or nearest lower supported values
-				 */
 				led->cdev.brightness /= LED_MPP_CURRENT_MIN;
 				led->cdev.brightness *= LED_MPP_CURRENT_MIN;
 			}
@@ -1228,7 +1214,7 @@ static void led_blink_do_work(struct work_struct *work)
 		case QPNP_ID_LED_MPP:
 			rc = pwm_config_us(led->mpp_cfg->pwm_cfg->pwm_dev, led->mpp_cfg->pwm_cfg->pwm_duty_us, led->mpp_cfg->pwm_cfg->pwm_period_us);
 			rc = pwm_enable(led->mpp_cfg->pwm_cfg->pwm_dev);
-			/* turn on indicator workaround, QCOM HW bug*/
+			
 			mdelay(10);
 			rc = pwm_enable(led->mpp_cfg->pwm_cfg->pwm_dev);
 			val = (led->mpp_cfg->source_sel & LED_MPP_SRC_MASK) |
@@ -1246,7 +1232,7 @@ static void led_blink_do_work(struct work_struct *work)
 		case QPNP_ID_RGB_BLUE:
 			rc = pwm_config_us(led->rgb_cfg->pwm_cfg->pwm_dev, led->rgb_cfg->pwm_cfg->pwm_duty_us, led->rgb_cfg->pwm_cfg->pwm_period_us);
 			rc = pwm_enable(led->rgb_cfg->pwm_cfg->pwm_dev);
-			/* turn on indicator workaround, QCOM HW bug*/
+			
 			mdelay(10);
 			rc = pwm_enable(led->rgb_cfg->pwm_cfg->pwm_dev);
 			led->status = BLINK;
@@ -1301,7 +1287,7 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 				return rc;
 			}
 			rc = pwm_enable(led->rgb_cfg->pwm_cfg->pwm_dev);
-			/* turn on indicator workaround, QCOM HW bug*/
+			
 			mdelay(10);
 			rc = pwm_enable(led->rgb_cfg->pwm_cfg->pwm_dev);
 			led->status = ON;
@@ -2785,7 +2771,7 @@ static DEVICE_ATTR(bln_rgb_pulse, (S_IWUSR|S_IRUGO),
 static ssize_t bln_coeff_div_show(struct device *dev,
             struct device_attribute *attr, char *buf)
 {
-      return snprintf(buf, PAGE_SIZE, "%d\n", (rgb_coeff_divider-1));
+      return snprintf(buf, PAGE_SIZE, "%d\n", (rgb_coeff_divider<20?(rgb_coeff_divider-1):20));
 }
 
 static ssize_t bln_coeff_div_dump(struct device *dev,
@@ -2900,6 +2886,7 @@ static DEVICE_ATTR(bln_light_level, (S_IWUSR|S_IRUGO),
 
 
 #endif
+
 static struct lut_params multicolor_lut_params = {
 	.flags = QPNP_LED_PWM_FLAGS | PM_PWM_LUT_PAUSE_HI_EN,
 	.idx_len = SHORT_LUT_LEN,
@@ -2910,16 +2897,15 @@ static struct lut_params multicolor_lut_params = {
 
 static int led_multicolor_short_blink(struct qpnp_led_data *led, int pwm_coefficient){
 	int rc = 0;
-	struct lut_params	lut_params = multicolor_lut_params;
+	struct lut_params	lut_params;
 	int *lut_short_blink;
+	LED_INFO("%s, name:%s, brightness = %d status: %d\n", __func__, led->cdev.name, led->cdev.brightness, led->status);
 
 	lut_params.flags = QPNP_LED_PWM_FLAGS | PM_PWM_LUT_PAUSE_HI_EN;
 	lut_params.idx_len = SHORT_LUT_LEN;
 	lut_params.ramp_step_ms = 64;
 	lut_params.lut_pause_hi = 1792; // Pause time = (1792 / 64 + 1) * 64 = 1856
 	lut_params.lut_pause_lo = 0;
-	LED_INFO("%s, name:%s, brightness = %d status: %d\n", __func__, led->cdev.name, led->cdev.brightness, led->status);
-	LED_INFO("%s: ramp %d pause %d hi %d lo\n", __func__, lut_params.ramp_step_ms, lut_params.lut_pause_hi, lut_params.lut_pause_lo);
 
 	switch(led->id){
 		case QPNP_ID_RGB_RED:
@@ -3056,7 +3042,7 @@ static int lpg_blink(struct led_classdev *led_cdev, int val)
 
 	led = container_of(led_cdev, struct qpnp_led_data, cdev);
 
-	LED_INFO("%s: bank %d blink %d status %d coefficient calc %d \n", __func__, led->id, val, led->status, (640 * led->rgb_cfg->pwm_cfg->pwm_coefficient / 255));
+	LED_DBG("%s: bank %d blink %d status %d\n", __func__, led->id, val, led->status);
 
 	switch (val) {
 	case BLINK_STOP:
@@ -3363,6 +3349,15 @@ static void led_alarm_handler(struct alarm *alarm)
 	queue_work(g_led_work_queue, &ldata->led_off_work);
 }*/
 
+static ssize_t led_off_timer_show(struct device *dev,
+                                    struct device_attribute *attr,
+                                    char *buf)
+{
+	int min = current_off_timer / 60;
+	int sec = current_off_timer - (min * 60);
+	return sprintf(buf, "%d %d\n", min, sec);
+}
+
 static ssize_t led_off_timer_store(struct device *dev,
 				   struct device_attribute *attr,
 				   const char *buf, size_t count)
@@ -3388,6 +3383,7 @@ static ssize_t led_off_timer_store(struct device *dev,
 
 	LED_DBG("Setting %s off_timer to %d min %d sec \n", led_cdev->name, min, sec);
 	off_timer = min * 60 + sec;
+	current_off_timer = off_timer;
 
 /*	alarm_cancel(&led->led_alarm);
 	cancel_work_sync(&led->led_off_work);
@@ -3398,7 +3394,7 @@ static ssize_t led_off_timer_store(struct device *dev,
 	}*/
 	return count;
 }
-static DEVICE_ATTR(off_timer, 0644, NULL, led_off_timer_store);
+static DEVICE_ATTR(off_timer, 0644, led_off_timer_show, led_off_timer_store);
 
 #ifdef CONFIG_LEDS_QPNP_BUTTON_BLINK
 
@@ -3923,7 +3919,7 @@ static ssize_t led_multi_color_show(struct device *dev,
 	return sprintf(buf, "%x\n", ModeRGB);
 }
 
-static void update_ModeRGB(struct qpnp_led_data *led, uint32_t val)
+static int update_ModeRGB(struct qpnp_led_data *led, uint32_t val)
 {
 	led->mode = (val & Mode_Mask) >> 24;
 	if(g_led_red)
@@ -3933,6 +3929,20 @@ static void update_ModeRGB(struct qpnp_led_data *led, uint32_t val)
 	if(g_led_blue)
 		g_led_blue->rgb_cfg->pwm_cfg->pwm_coefficient = (val & Blue_Mask) * indicator_pwm_ratio / 255;
 	ModeRGB = val;
+#ifdef CONFIG_LEDS_QPNP_BUTTON_BLINK
+	// we suppose charging if it's coloring led in CONSTANT light and RED (mode val = 1 and only red or only full green (100%) is enabled)
+	supposedly_charging = led->mode == 1 && (g_led_red->rgb_cfg->pwm_cfg->pwm_coefficient > 0 || g_led_green->rgb_cfg->pwm_cfg->pwm_coefficient > 0);
+
+	LED_INFO(" %s , RED = %d supposedly charging %d charging %d\n" , __func__, g_led_red->rgb_cfg->pwm_cfg->pwm_coefficient, supposedly_charging, charging);
+
+	if (colored_charge_level && supposedly_charging && first_level_registered) {
+		// if it's supposedly charging and first level registered from HTC battery, we can go and set charge level color mix instead of normal multicolor setting later...
+		led_multi_color_charge_level(charge_level);
+		// and return so color is not overwritten...
+		return 1;
+	}
+#endif
+	return 0;
 }
 
 static ssize_t led_multi_color_store(struct device *dev,
@@ -3948,8 +3958,14 @@ static ssize_t led_multi_color_store(struct device *dev,
 		return -EINVAL;
 	led_cdev = (struct led_classdev *) dev_get_drvdata(dev);
 	led = container_of(led_cdev, struct qpnp_led_data, cdev);
-
-	update_ModeRGB(led, val);
+	led->mode = (val & Mode_Mask) >> 24;
+	if(g_led_red)
+		g_led_red->rgb_cfg->pwm_cfg->pwm_coefficient= ((val & Red_Mask) >> 16) * indicator_pwm_ratio / 255;
+	if(g_led_green)
+		g_led_green->rgb_cfg->pwm_cfg->pwm_coefficient = ((val & Green_Mask) >> 8) * indicator_pwm_ratio / 255;
+	if(g_led_blue)
+		g_led_blue->rgb_cfg->pwm_cfg->pwm_coefficient = (val & Blue_Mask) * indicator_pwm_ratio / 255;
+	ModeRGB = val;
 	LED_INFO(" %s , ModeRGB = %x\n" , __func__, val);
 #ifdef CONFIG_LEDS_QPNP_BUTTON_BLINK
 	// we suppose charging if it's coloring led in CONSTANT light and RED (mode val = 1 and only red or only full green (100%) is enabled)
@@ -3990,7 +4006,7 @@ static ssize_t led_multi_color_mode_and_lut_params_store(struct device *dev,
 		return -EINVAL;
 	}
 
-	update_ModeRGB(led, new_ModeRGB);
+	if (update_ModeRGB(led, new_ModeRGB)) return count;
 	multicolor_lut_params.ramp_step_ms = ramp_step_ms;
 	multicolor_lut_params.lut_pause_hi = lut_pause_hi;
 	multicolor_lut_params.lut_pause_lo = lut_pause_lo;
@@ -4265,7 +4281,6 @@ static int fb_notifier_callback(struct notifier_block *self,
 		LED_ERR("%s on\n", __func__);
 		alarm_cancel(&blinkstopfunc_rtc);
 #endif
-			// late resume
             break;
 
         case FB_BLANK_POWERDOWN:
@@ -4277,7 +4292,6 @@ static int fb_notifier_callback(struct notifier_block *self,
 		screen_on = 0;
 		LED_ERR("%s off\n", __func__);
 #endif
-            //early suspend
             if(g_led_virtual->cdev.brightness) {
 				g_led_virtual->cdev.brightness = 0;
                 qpnp_mpp_set(g_led_virtual);
