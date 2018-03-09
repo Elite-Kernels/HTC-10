@@ -39,6 +39,8 @@ Module.symvers
 #
 # Top-level generic files
 #
+/out
+/out_ocn
 /tags
 /TAGS
 /linux
