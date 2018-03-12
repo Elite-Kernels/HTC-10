@@ -546,6 +546,7 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 	if (usb_endpoint_xfer_isoc(desc)
 	    || (dep->endpoint.is_ncm && !usb_endpoint_xfer_control(desc)))
 		params.param1 |= DWC3_DEPCFG_XFER_IN_PROGRESS_EN;
+/*-- 2015/12/25, USB Team, PCN00051 --*/
 
 	/*
 	 * We are doing 1:1 mapping for endpoints, meaning
@@ -2805,11 +2806,16 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 	}
 }
 
-static void dwc3_disconnect_gadget(struct dwc3 *dwc)
+static void dwc3_disconnect_gadget(struct dwc3 *dwc, int mute) /*++ 2015/11/26 USB Team, PCN00043 ++*/
 {
 	if (dwc->gadget_driver && dwc->gadget_driver->disconnect) {
 		spin_unlock(&dwc->lock);
-		dwc->gadget_driver->disconnect(&dwc->gadget);
+/*++ 2015/11/26 USB Team, PCN00043 ++*/
+		if (mute)
+			dwc->gadget_driver->mute_disconnect(&dwc->gadget);
+		else
+			dwc->gadget_driver->disconnect(&dwc->gadget);
+/*-- 2015/11/26 USB Team, PCN00043 --*/
 		spin_lock(&dwc->lock);
 	}
 	dwc->gadget.xfer_isr_count = 0;
@@ -3015,7 +3021,7 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	usb_gadget_vbus_draw(&dwc->gadget, 0);
 
 	if (dwc->gadget.speed != USB_SPEED_UNKNOWN)
-		dwc3_disconnect_gadget(dwc);
+		dwc3_disconnect_gadget(dwc, 1);   /*++ 2015/11/26 USB Team, PCN00043 ++*/
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	reg &= ~DWC3_DCTL_TSTCTRL_MASK;

@@ -140,8 +140,6 @@ struct kgsl_driver {
 
 	struct kgsl_driver_htc_priv priv;
 
-	struct kthread_worker worker;
-	struct task_struct *worker_thread;
 };
 
 extern struct kgsl_driver kgsl_driver;

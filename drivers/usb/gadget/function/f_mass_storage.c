@@ -3107,28 +3107,12 @@ static ssize_t file_store(struct device *dev, struct device_attribute *attr,
 	return fsg_store_file(curlun, filesem, buf, count);
 }
 
-<<<<<<< HEAD
-static ssize_t cdrom_store(struct device *dev, struct device_attribute *attr,
-			  const char *buf, size_t count)
-{
-	struct fsg_lun		*curlun = fsg_lun_from_dev(dev);
-	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
-
-	return fsg_store_cdrom(curlun, filesem, buf, count);
-}
-
-=======
->>>>>>> 15f5854... tree: merge oreo update 3.16.708.3_R
 static DEVICE_ATTR_RW(ro);
 static DEVICE_ATTR_RW(nofua);
 static DEVICE_ATTR_RW(file);
 static DEVICE_ATTR(perf, 0644, fsg_show_perf, fsg_store_perf);
-static DEVICE_ATTR_RW(cdrom);
 
-<<<<<<< HEAD
-=======
 static struct device_attribute dev_attr_ro_cdrom = __ATTR_RO(ro);
->>>>>>> 15f5854... tree: merge oreo update 3.16.708.3_R
 static struct device_attribute dev_attr_file_nonremovable = __ATTR_RO(file);
 
 
@@ -3277,10 +3261,6 @@ static inline void fsg_common_remove_sysfs(struct fsg_lun *lun)
 	device_remove_file(&lun->dev, &dev_attr_ro);
 	device_remove_file(&lun->dev, &dev_attr_file);
 	device_remove_file(&lun->dev, &dev_attr_perf);
-<<<<<<< HEAD
-	device_remove_file(&lun->dev, &dev_attr_cdrom);
-=======
->>>>>>> 15f5854... tree: merge oreo update 3.16.708.3_R
 }
 
 void fsg_common_remove_lun(struct fsg_lun *lun, bool sysfs)
@@ -3403,22 +3383,12 @@ static inline int fsg_common_add_sysfs(struct fsg_common *common,
 		return rc;
 	}
 
-<<<<<<< HEAD
-	rc = device_create_file(&lun->dev, &dev_attr_cdrom);
-	if (rc)
-		goto error;
-	rc = device_create_file(&lun->dev, &dev_attr_ro);
-	if (rc)
-		goto error;
-
-=======
 	rc = device_create_file(&lun->dev,
 				lun->cdrom
 			      ? &dev_attr_ro_cdrom
 			      : &dev_attr_ro);
 	if (rc)
 		goto error;
->>>>>>> 15f5854... tree: merge oreo update 3.16.708.3_R
 	rc = device_create_file(&lun->dev,
 				lun->removable
 			      ? &dev_attr_file

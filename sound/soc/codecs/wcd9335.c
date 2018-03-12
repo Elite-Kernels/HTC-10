@@ -13822,6 +13822,8 @@ err:
 	return ret;
 }
 
+/* HTC_AUD_START */
+#ifdef CONFIG_USE_CODEC_MBHC
 static struct regulator *tasha_codec_find_ondemand_regulator(
 		struct snd_soc_codec *codec, const char *name)
 {
